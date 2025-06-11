@@ -5,9 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreditCard as Edit3, Settings, Star, MapPin, Phone, Mail, Tag, LogOut } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '@/stores/useUserStore';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  const currentUser = useUserStore((state) => state.currentUser);
+  const { currentUser, setCurrentUser, setAuthenticated } = useUserStore();
   const [isAvailable, setIsAvailable] = useState(currentUser?.isAvailable || false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
@@ -50,7 +51,18 @@ export default function ProfileScreen() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: () => console.log('Sign out') },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive', 
+          onPress: () => {
+            // Clear user data and authentication state
+            setCurrentUser(null);
+            setAuthenticated(false);
+            
+            // Navigate back to onboarding/login
+            router.replace('/onboarding');
+          }
+        },
       ]
     );
   };
