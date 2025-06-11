@@ -1,0 +1,171 @@
+You are an AI software engineer tasked with building a production-ready, professional networking app called RoleNet. The app is designed to connect users based on their professional roles and needs. You must build this using React Native (with Expo), Zustand for state management, Firebase for backend services, and other necessary tools.
+
+Project Name: RoleNet
+
+App Summary:
+RoleNet is a real-time, professional matchmaking app that allows users from any field (e.g., teacher, driver, doctor, student, shopkeeper, architect, etc.) to connect globally and locally. Users discover professionals based on role and tag filters, send connection requests (“pings”), and initiate calls and chat. The app is designed to be inclusive, fast, and intuitive.
+
+---
+
+## 🔑 Core Features:
+
+1. Onboarding & Authentication
+- Firebase Auth (email/password or phone auth)
+- Onboarding flow: select professional popular role or custom role, add popular tags or custom tag, location permission and location data.
+- Profile setup: name, photo, short bio
+
+### 2. User Profiles
+- Public profile with role, tags, rating, online status, availability toggle, interaction options
+- Users can edit bio, tags, avatar, location data and visibility
+- other user could rate and endorse from profile.
+
+### 3. Discover & Search
+- Nearby professionals (via GPS)
+- Global search (by role, tags, distance)
+- Real-time filters: availability, distance, online status
+- User cards showing avatar, name, role, rating, "Ping" button, “view profile” button.
+
+### 4. Ping System
+- Users send “Pings” with a note/request
+- Ping statuses: pending, responded, ignored
+- Ping triggers push notification to receiver (via FCM)
+- Respond with chat or friend request
+
+### 5. Friend Requests
+- View current friends and activity history
+- Send/accept/decline friend requests
+
+### 6. Calling System
+- Peer-to-peer audio calling via `react-native-webrtc`
+- Firebase Firestore as signaling server
+- TURN/STUN support for NAT traversal
+- Call UI: incoming screen, mute, speaker, end
+
+### 7. Chat System (Optional Post-Friend Request or Post-Ping)
+- Real-time messaging via Firestore
+- Support for text and media (images/audio)
+- Read receipts, typing indicators
+- Push notifications on new messages
+
+### 8. Ratings & Reviews
+- After a call or chat, users can rate the experience (1–5 stars)
+- Leave optional text feedback
+- Ratings update user’s profile average
+- Prevent duplicate ratings for same interaction
+
+### 9. Ping Activity Page
+- Tabs: Received, Sent, Responded
+- Each item shows timestamp, message, user info
+- Quick reply actions (Call, chat, Ignore)
+
+### 10. Settings & Notifications
+- Manage availability, visibility, notifications
+- Push notifications with `expo-notifications` + Firebase Cloud Messaging
+- Privacy and block options
+
+---
+
+## 🔧 State Management (Zustand)
+- User state
+- Friends and pings
+- Call state
+- Chat state
+- Notification preferences
+
+---
+
+## 🧠 Firebase Setup
+- Firebase Auth
+- Cloud Firestore for users, pings, calls, chats
+- Firebase Functions (for automated FCM notifications)
+- Firebase Storage (profile photos, media messages)
+- Firebase Cloud Messaging
+
+---
+
+## 📄 Data Models
+
+### Users
+- id, name, role, tags, location, avatar, onlineStatus, createdAt, rating, ratingCount
+
+### Pings
+- id, senderId, receiverId, message, status, createdAt
+
+### Calls
+- id, callerId, calleeId, offer, answer, iceCandidates, status, createdAt
+
+### Friends
+- id, userA, userB, status, createdAt
+
+### Chats
+- id, participants, lastMessage, lastMessageTime, unreadCount, createdAt
+
+### Messages (Subcollection under Chats)
+- id, senderId, text, mediaUrl, type, status, timestamp
+
+### Ratings
+- id, raterId, ratedUserId, rating, feedback, context, createdAt
+
+---
+
+## 🎨 UI/UX Design Guidelines
+
+- Unique layout with gradient blue/teal theme
+- Modern rounded components (Tailwind-like spacing)
+- Bottom tab navigation (Discover, Activity, Friends, Profile)
+- Clean typography, responsive layouts
+- Use `react-native-paper` or `react-native-ui-lib` for reusable UI
+
+---
+
+## 📦 Required Dependencies
+
+- react-native
+- expo
+- expo-go
+- zustand
+- firebase
+- react-navigation
+- react-native-webrtc
+- expo-location
+- expo-notifications
+- @react-native-firebase/app
+- @react-native-firebase/messaging
+- react-native-paper or react-native-ui-lib
+- @expo/vector-icons
+- react-native-dotenv
+
+---
+
+## 🚀 Deliverables
+
+- Full source code with modular structure
+- All Zustand stores (user, pings, calls, chat, rating)
+- Firebase config, rules, and cloud functions
+- Push notification setup
+- UI components and screen flows
+- App icon and splash screen
+- Complete README and Firebase setup guide
+
+---
+
+Branding:
+App Name: RoleNet
+Tagline: "Every Role. One Network."
+Voice: Inclusive, professional, direct
+Design: Blue/teal palette, modern typography, clear icons
+
+Screens to Implement:
+- Onboarding
+- Login/Sign Up
+- Profile Setup
+- Discover (Nearby/Global)
+- Profile (View/Edit)
+- Ping Activity
+- Friends
+- Call Screen
+- Chat Screen
+- Settings
+
+Goal:
+Build a complete and production-ready mobile app using React Native and Expo, with Firebase and Zustand, that connects people professionally across roles and needs — globally and locally — with support for discovery, pings, calling, chatting and friend networking.
