@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { Text, Button, TextInput, Card, Chip, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, User, Tag, ArrowRight } from 'lucide-react-native';
+import { MapPin, User, Tag, ArrowRight, Globe } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useUserStore } from '@/stores/useUserStore';
 import { POPULAR_ROLES, POPULAR_TAGS } from '@/lib/types';
@@ -18,6 +18,8 @@ export default function OnboardingScreen() {
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [location, setLocation] = useState<any>(null);
+  const [manualLocation, setManualLocation] = useState({ city: '', country: '' });
+  const [locationMethod, setLocationMethod] = useState<'auto' | 'manual' | 'skip'>('auto');
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   const { setCurrentUser, setAuthenticated } = useUserStore();
@@ -59,12 +61,35 @@ export default function OnboardingScreen() {
       };
 
       setLocation(locationData);
+      setLocationMethod('auto');
     } catch (error) {
       console.error('Location error:', error);
       Alert.alert('Error', 'Failed to get your location. Please try again.');
     } finally {
       setIsLoadingLocation(false);
     }
+  };
+
+  const handleManualLocation = () => {
+    if (manualLocation.city.trim() && manualLocation.country.trim()) {
+      const locationData = {
+        latitude: 0,
+        longitude: 0,
+        address: `${manualLocation.city}, ${manualLocation.country}`,
+      };
+      setLocation(locationData);
+      setLocationMethod('manual');
+    }
+  };
+
+  const handleSkipLocation = () => {
+    const locationData = {
+      latitude: 0,
+      longitude: 0,
+      address: 'Location not shared',
+    };
+    setLocation(locationData);
+    setLocationMethod('skip');
   };
 
   const toggleTag = (tag: string) => {
@@ -300,40 +325,106 @@ export default function OnboardingScreen() {
 
       case 4:
         return (
-          <View style={styles.stepContent}>
+          <ScrollView style={styles.stepContent} showsVerticalScrollIndicator={false}>
             <MapPin size={64} color="white" style={styles.stepIcon} />
             <Text variant="headlineMedium" style={styles.stepTitle}>
               Share your location
             </Text>
             <Text variant="bodyLarge" style={styles.stepSubtitle}>
-              Help others find you and discover nearby professionals
+              Help others find you and discover nearby professionals (optional)
             </Text>
             
-            {location ? (
+            {!location && (
+              <View style={styles.locationOptions}>
+                <Button
+                  mode="contained"
+                  onPress={requestLocation}
+                  loading={isLoadingLocation}
+                  disabled={isLoadingLocation}
+                  style={styles.locationButton}
+                  buttonColor="rgba(255, 255, 255, 0.2)"
+                  icon={({ size, color }) => <MapPin size={size} color={color} />}
+                >
+                  {isLoadingLocation ? 'Getting Location...' : 'Use Current Location'}
+                </Button>
+
+                <Text variant="bodyMedium" style={styles.orText}>
+                  or
+                </Text>
+
+                <Card style={styles.manualLocationCard}>
+                  <Card.Content>
+                    <Text variant="titleMedium" style={styles.manualLocationTitle}>
+                      Enter Location Manually
+                    </Text>
+                    <TextInput
+                      mode="outlined"
+                      placeholder="City"
+                      value={manualLocation.city}
+                      onChangeText={(text) => setManualLocation(prev => ({ ...prev, city: text }))}
+                      style={styles.manualInput}
+                    />
+                    <TextInput
+                      mode="outlined"
+                      placeholder="Country"
+                      value={manualLocation.country}
+                      onChangeText={(text) => setManualLocation(prev => ({ ...prev, country: text }))}
+                      style={styles.manualInput}
+                    />
+                    <Button
+                      mode="contained"
+                      onPress={handleManualLocation}
+                      disabled={!manualLocation.city.trim() || !manualLocation.country.trim()}
+                      style={styles.setLocationButton}
+                      icon={({ size, color }) => <Globe size={size} color={color} />}
+                    >
+                      Set Location
+                    </Button>
+                  </Card.Content>
+                </Card>
+
+                <Button
+                  mode="text"
+                  onPress={handleSkipLocation}
+                  style={styles.skipButton}
+                  textColor="rgba(255, 255, 255, 0.8)"
+                >
+                  Skip for now
+                </Button>
+              </View>
+            )}
+
+            {location && (
               <Card style={styles.locationCard}>
                 <Card.Content>
                   <View style={styles.locationInfo}>
                     <MapPin size={24} color="#3B82F6" />
-                    <Text variant="bodyLarge" style={styles.locationText}>
-                      {location.address}
-                    </Text>
+                    <View style={styles.locationDetails}>
+                      <Text variant="bodyLarge" style={styles.locationText}>
+                        {location.address}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.locationMethod}>
+                        {locationMethod === 'auto' && 'Detected automatically'}
+                        {locationMethod === 'manual' && 'Entered manually'}
+                        {locationMethod === 'skip' && 'Location sharing disabled'}
+                      </Text>
+                    </View>
                   </View>
+                  <Button
+                    mode="outlined"
+                    onPress={() => {
+                      setLocation(null);
+                      setLocationMethod('auto');
+                      setManualLocation({ city: '', country: '' });
+                    }}
+                    style={styles.changeLocationButton}
+                  >
+                    Change Location
+                  </Button>
                 </Card.Content>
               </Card>
-            ) : (
-              <Button
-                mode="contained"
-                onPress={requestLocation}
-                loading={isLoadingLocation}
-                disabled={isLoadingLocation}
-                style={styles.locationButton}
-                buttonColor="rgba(255, 255, 255, 0.2)"
-                icon={({ size, color }) => <MapPin size={size} color={color} />}
-              >
-                {isLoadingLocation ? 'Getting Location...' : 'Enable Location'}
-              </Button>
             )}
-          </View>
+          </ScrollView>
         );
 
       default:
@@ -528,20 +619,58 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 16,
   },
+  locationOptions: {
+    gap: 16,
+  },
+  locationButton: {
+    marginBottom: 8,
+  },
+  orText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  manualLocationCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 16,
+  },
+  manualLocationTitle: {
+    marginBottom: 16,
+    color: '#374151',
+    fontWeight: 'bold',
+  },
+  manualInput: {
+    marginBottom: 12,
+  },
+  setLocationButton: {
+    marginTop: 8,
+  },
+  skipButton: {
+    alignSelf: 'center',
+  },
   locationCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 24,
   },
   locationInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  locationDetails: {
+    marginLeft: 12,
+    flex: 1,
   },
   locationText: {
-    marginLeft: 12,
     color: '#374151',
+    marginBottom: 4,
   },
-  locationButton: {
-    marginBottom: 24,
+  locationMethod: {
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  changeLocationButton: {
+    borderColor: '#3B82F6',
   },
   footer: {
     paddingHorizontal: 24,
