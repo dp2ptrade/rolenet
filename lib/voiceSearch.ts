@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { Audio } from 'expo-av';
 
 export interface VoiceSearchConfig {
   elevenLabsApiKey: string;
@@ -10,6 +11,7 @@ export class VoiceSearchService {
   private static isRecording = false;
   private static mediaRecorder: any;
   private static audioChunks: Blob[] = [];
+  private static recording: Audio.Recording | null = null;
 
   static configure(config: VoiceSearchConfig) {
     this.config = config;
@@ -36,6 +38,11 @@ export class VoiceSearchService {
   // Web implementation using Web Audio API
   private static async startWebRecording(): Promise<void> {
     try {
+      // Check if we're in a web environment with proper API support
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone not available in this environment');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.mediaRecorder = new MediaRecorder(stream);
       this.audioChunks = [];
@@ -46,9 +53,16 @@ export class VoiceSearchService {
 
       this.mediaRecorder.start();
       this.isRecording = true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting web recording:', error);
-      throw new Error('Failed to start recording. Please check microphone permissions.');
+      if (error.name === 'NotAllowedError') {
+        throw new Error('Microphone permission denied. Please allow microphone access in your browser.');
+      } else if (error.name === 'NotFoundError') {
+        throw new Error('No microphone found. Please connect a microphone and try again.');
+      } else if (error.name === 'NotSupportedError') {
+        throw new Error('Audio recording not supported in this browser.');
+      }
+      throw new Error('Failed to access microphone. Please check your browser settings.');
     }
   }
 
@@ -78,27 +92,70 @@ export class VoiceSearchService {
     });
   }
 
-  // Native implementation (placeholder for expo-av)
+  // Native implementation using expo-av
   private static async startNativeRecording(): Promise<void> {
-    // This would use expo-av for native recording
-    // For now, we'll use web implementation as fallback
-    if (Platform.OS !== 'web') {
-      console.warn('Native voice recording not implemented yet, using web fallback');
+    try {
+      // Request permissions
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Microphone permission denied. Please enable microphone access in your device settings.');
+      }
+
+      // Configure audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      // Create and start recording
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      
+      this.recording = recording;
+      this.isRecording = true;
+    } catch (error: any) {
+      console.error('Error starting native recording:', error);
+      if (error.message && error.message.includes('permission')) {
+        throw error; // Re-throw permission errors with original message
+      }
+      throw new Error('Failed to start recording. Please check microphone permissions.');
     }
-    return this.startWebRecording();
   }
 
   private static async stopNativeRecording(): Promise<string> {
-    // This would use expo-av for native recording
-    // For now, we'll use web implementation as fallback
-    return this.stopWebRecording();
+    try {
+      if (!this.recording || !this.isRecording) {
+        throw new Error('No active recording');
+      }
+
+      await this.recording.stopAndUnloadAsync();
+      const uri = this.recording.getURI();
+      this.isRecording = false;
+      
+      if (!uri) {
+        throw new Error('Failed to get recording URI');
+      }
+
+      // For now, return a placeholder transcript
+      // In a real implementation, you would send the audio file to a speech-to-text service
+      return 'Voice recording completed. Speech-to-text not implemented for native platforms yet.';
+    } catch (error) {
+      console.error('Error stopping native recording:', error);
+      throw new Error('Failed to stop recording.');
+    } finally {
+      this.recording = null;
+    }
   }
 
   // Transcribe audio using ElevenLabs or Web Speech API
   private static async transcribeAudio(audioBlob: Blob): Promise<string> {
-    // Try Web Speech API first (free and fast)
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      return this.transcribeWithWebSpeech(audioBlob);
+    // Check if we're in a web environment first
+    if (Platform.OS === 'web') {
+      // Try Web Speech API first (free and fast)
+      if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        return this.transcribeWithWebSpeech(audioBlob);
+      }
     }
 
     // Fallback to ElevenLabs if configured
@@ -106,7 +163,7 @@ export class VoiceSearchService {
       return this.transcribeWithElevenLabs(audioBlob);
     }
 
-    throw new Error('No speech recognition service available');
+    throw new Error('No speech recognition service available. Please configure ElevenLabs API key for speech-to-text.');
   }
 
   // Web Speech API implementation (free, works offline)
@@ -139,7 +196,7 @@ export class VoiceSearchService {
 
       // Convert blob to audio URL and play it for recognition
       const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const audio = new (window as any).Audio(audioUrl);
       
       recognition.start();
       
@@ -179,8 +236,13 @@ export class VoiceSearchService {
   // Text-to-speech for voice feedback (using ElevenLabs)
   static async speakText(text: string): Promise<void> {
     if (!this.config?.elevenLabsApiKey) {
-      // Fallback to Web Speech API
-      return this.speakWithWebSpeech(text);
+      // Fallback to Web Speech API only on web platform
+      if (Platform.OS === 'web') {
+        return this.speakWithWebSpeech(text);
+      } else {
+        console.log('TTS:', text); // Just log on native platforms without ElevenLabs
+        return;
+      }
     }
 
     try {
@@ -207,7 +269,7 @@ export class VoiceSearchService {
 
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+      const audio = new (window as any).Audio(audioUrl);
       
       await audio.play();
       
@@ -217,19 +279,25 @@ export class VoiceSearchService {
       };
     } catch (error) {
       console.error('ElevenLabs TTS error:', error);
-      // Fallback to Web Speech API
-      this.speakWithWebSpeech(text);
+      // Fallback to Web Speech API only on web platform
+      if (Platform.OS === 'web') {
+        this.speakWithWebSpeech(text);
+      } else {
+        console.log('TTS fallback:', text);
+      }
     }
   }
 
   // Web Speech API TTS fallback
   private static speakWithWebSpeech(text: string): void {
-    if ('speechSynthesis' in window) {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.8;
       utterance.pitch = 1;
       utterance.volume = 0.8;
       speechSynthesis.speak(utterance);
+    } else {
+      console.log('Web Speech API not available:', text);
     }
   }
 

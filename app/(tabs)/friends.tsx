@@ -1,130 +1,157 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { Card, Text, Avatar, Button, Surface, Searchbar, FAB } from 'react-native-paper';
+import { Card, Text, Avatar, Button, Surface, Searchbar, FAB, Portal, Dialog, Paragraph, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Phone, MessageSquare, Star, UserPlus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { User, Friend } from '@/lib/types';
-
-const MOCK_FRIENDS: User[] = [
-  {
-    id: '2',
-    name: 'Michael Chen',
-    email: 'michael@example.com',
-    role: 'Developer',
-    tags: ['Technology', 'Programming', 'Innovation'],
-    location: { latitude: 37.7849, longitude: -122.4094, address: 'San Francisco, CA' },
-    avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
-    bio: 'Full-stack developer passionate about clean code',
-    onlineStatus: 'online',
-    isAvailable: true,
-    rating: 4.9,
-    ratingCount: 45,
-    createdAt: new Date(),
-    lastSeen: new Date(),
-  },
-  {
-    id: '3',
-    name: 'Dr. Amanda Rodriguez',
-    email: 'amanda@example.com',
-    role: 'Doctor',
-    tags: ['Healthcare', 'Wellness', 'Consultation'],
-    location: { latitude: 37.7649, longitude: -122.4294, address: 'San Francisco, CA' },
-    avatar: 'https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=400',
-    bio: 'Family physician with expertise in preventive care',
-    onlineStatus: 'offline',
-    isAvailable: false,
-    rating: 4.7,
-    ratingCount: 67,
-    createdAt: new Date(),
-    lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-  },
-];
-
-const MOCK_FRIEND_REQUESTS: Friend[] = [
-  {
-    id: '1',
-    userA: '4',
-    userB: '1',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-  },
-  {
-    id: '2',
-    userA: '5',
-    userB: '1',
-    status: 'pending',
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  },
-];
+import { useUserStore } from '@/stores/useUserStore';
+import { useFriendStore } from '@/stores/useFriendStore';
+import { UserService } from '@/lib/supabaseService';
 
 export default function FriendsScreen() {
   const [selectedTab, setSelectedTab] = useState<'friends' | 'requests'>('friends');
   const [searchQuery, setSearchQuery] = useState('');
+  const { user } = useUserStore();
+  const {
+    friends,
+    friendRequests,
+    isLoading,
+    loadFriends,
+    loadFriendRequests,
+    acceptFriendRequest,
+    declineFriendRequest
+  } = useFriendStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [friends] = useState<User[]>(MOCK_FRIENDS);
-  const [friendRequests] = useState<Friend[]>(MOCK_FRIEND_REQUESTS);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingTarget, setRatingTarget] = useState<User | null>(null);
+  const [ratingValue, setRatingValue] = useState(5);
+  const [ratingFeedback, setRatingFeedback] = useState('');
+  const [requestUsers, setRequestUsers] = useState<{[id: string]: User}>({});
 
-  const onRefresh = React.useCallback(() => {
+  useEffect(() => {
+    if (user?.id) {
+      loadFriends(user.id);
+      loadFriendRequests(user.id);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    // Fetch user info for all friend requests
+    async function fetchRequestUsers() {
+      const ids = friendRequests.map(r => r.user_a).filter(id => !(id in requestUsers));
+      if (ids.length > 0) {
+        const users: {[id: string]: User} = {...requestUsers};
+        for (const id of ids) {
+          const { data, error } = await UserService.getUserProfile(id);
+          if (data && !error) {
+            users[id] = data as User;
+          }
+        }
+        setRequestUsers(users);
+      }
+    }
+    fetchRequestUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendRequests]);
+
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  }, []);
+    if (user?.id) {
+      await Promise.all([
+        loadFriends(user.id),
+        loadFriendRequests(user.id)
+      ]);
+    }
+    setRefreshing(false);
+  }, [user?.id]);
 
-  const filteredFriends = friends.filter(friend =>
-    friend.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    friend.role.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFriends = friends.filter(friend => 
+    friend && 
+    typeof friend.name === 'string' && 
+    typeof friend.role === 'string' && 
+    (friend.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    friend.role.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleCall = (userId: string) => {
-    console.log('Call user:', userId);
-    // TODO: Implement call functionality
+    const friend = friends.find(f => f.id === userId);
+    if (friend) {
+      router.push({
+        pathname: '/call',
+        params: {
+          userId: friend.id,
+          userName: friend.name,
+          userRole: friend.role,
+          userAvatar: friend.avatar || ''
+        }
+      });
+    }
   };
 
   const handleChat = (userId: string) => {
-    console.log('Chat with user:', userId);
-    // TODO: Navigate to chat
+    const friend = friends.find(f => f.id === userId);
+    if (friend) {
+      router.push({
+        pathname: '/chat',
+        params: {
+          userId: friend.id,
+          userName: friend.name,
+          userRole: friend.role,
+          userAvatar: friend.avatar || ''
+        }
+      });
+    }
   };
 
   const handleRate = (userId: string) => {
-    console.log('Rate user:', userId);
-    // TODO: Show rating modal
+    const friend = friends.find(f => f.id === userId);
+    if (friend) {
+      setRatingTarget(friend);
+      setRatingValue(5);
+      setRatingFeedback('');
+      setRatingModalVisible(true);
+    }
   };
 
-  const handleAcceptRequest = (requestId: string) => {
-    console.log('Accept friend request:', requestId);
-    // TODO: Accept friend request
+  const submitRating = async () => {
+    if (ratingTarget && user) {
+      // TODO: Integrate with RatingService to submit rating
+      setRatingModalVisible(false);
+    }
   };
 
-  const handleDeclineRequest = (requestId: string) => {
-    console.log('Decline friend request:', requestId);
-    // TODO: Decline friend request
+  const handleAcceptRequest = async (requestId: string) => {
+    try {
+      await acceptFriendRequest(requestId);
+      if (user?.id) {
+        await loadFriends(user.id);
+        await loadFriendRequests(user.id);
+      }
+    } catch (error) {
+      console.error('Error accepting friend request:', error);
+      // Optionally show error to user
+    }
   };
 
-  const getUserInfo = (userId: string) => {
-    const users: { [key: string]: { name: string; avatar: string; role: string } } = {
-      '4': {
-        name: 'Emma Thompson',
-        avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
-        role: 'Designer'
-      },
-      '5': {
-        name: 'David Wilson',
-        avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
-        role: 'Architect'
-      },
-    };
-    return users[userId] || { name: 'Unknown User', avatar: '', role: 'Professional' };
+  const handleDeclineRequest = async (requestId: string) => {
+    try {
+      await declineFriendRequest(requestId);
+      if (user?.id) {
+        await loadFriendRequests(user.id);
+      }
+    } catch (error) {
+      // Optionally show error to user
+    }
   };
 
-  const getLastSeenText = (lastSeen: Date) => {
+  const getLastSeenText = (last_seen: Date) => {
     const now = new Date();
-    const diff = now.getTime() - lastSeen.getTime();
+    const diff = now.getTime() - new Date(last_seen).getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-
     if (days > 0) return `Last seen ${days}d ago`;
     if (hours > 0) return `Last seen ${hours}h ago`;
     if (minutes > 0) return `Last seen ${minutes}m ago`;
@@ -154,7 +181,7 @@ export default function FriendsScreen() {
               style={styles.tabButton}
               compact
             >
-              Friends ({friends.length})
+              Friends ({friends.filter(friend => friend && friend.name && friend.role).length})
             </Button>
             <Button
               mode={selectedTab === 'requests' ? 'contained' : 'text'}
@@ -184,7 +211,9 @@ export default function FriendsScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {selectedTab === 'friends' ? (
-            filteredFriends.length === 0 ? (
+            isLoading ? (
+              <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading friends...</Text>
+            ) : filteredFriends.length === 0 ? (
               <Card style={styles.emptyCard}>
                 <Card.Content style={styles.emptyContent}>
                   <UserPlus size={48} color="#6B7280" />
@@ -197,19 +226,19 @@ export default function FriendsScreen() {
                 </Card.Content>
               </Card>
             ) : (
-              filteredFriends.map((friend) => (
-                <Card key={friend.id} style={styles.friendCard}>
+              filteredFriends.map((friend, index) => (
+                <Card key={`${friend.id}-${index}`} style={styles.friendCard}>
                   <Card.Content>
                     <View style={styles.friendHeader}>
                       <View style={styles.userInfo}>
                         <View style={styles.avatarContainer}>
                           <Avatar.Image 
                             size={60} 
-                            source={{ uri: friend.avatar }} 
+                            source={{ uri: friend.avatar || '' }} 
                           />
                           <View style={[
                             styles.statusDot,
-                            { backgroundColor: friend.onlineStatus === 'online' ? '#10B981' : '#EF4444' }
+                            { backgroundColor: friend.online_status === 'online' ? '#10B981' : '#EF4444' }
                           ]} />
                         </View>
                         
@@ -223,11 +252,11 @@ export default function FriendsScreen() {
                           <View style={styles.ratingRow}>
                             <Star size={16} color="#F59E0B" fill="#F59E0B" />
                             <Text variant="bodySmall" style={styles.rating}>
-                              {friend.rating} ({friend.ratingCount})
+                              {friend.rating} ({friend.rating_count})
                             </Text>
                           </View>
                           <Text variant="bodySmall" style={styles.lastSeen}>
-                            {getLastSeenText(friend.lastSeen)}
+                            {getLastSeenText(friend.last_seen)}
                           </Text>
                         </View>
                       </View>
@@ -267,7 +296,9 @@ export default function FriendsScreen() {
               ))
             )
           ) : (
-            friendRequests.length === 0 ? (
+            isLoading ? (
+              <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading requests...</Text>
+            ) : friendRequests.length === 0 ? (
               <Card style={styles.emptyCard}>
                 <Card.Content style={styles.emptyContent}>
                   <UserPlus size={48} color="#6B7280" />
@@ -280,29 +311,28 @@ export default function FriendsScreen() {
                 </Card.Content>
               </Card>
             ) : (
-              friendRequests.map((request) => {
-                const user = getUserInfo(request.userA);
+              friendRequests.map((request, index) => {
+                const requestUser = requestUsers[request.user_a];
                 return (
-                  <Card key={request.id} style={styles.requestCard}>
+                  <Card key={`${request.id}-${index}`} style={styles.requestCard}>
                     <Card.Content>
                       <View style={styles.requestHeader}>
                         <Avatar.Image 
                           size={50} 
-                          source={{ uri: user.avatar }} 
+                          source={{ uri: requestUser?.avatar || '' }}
                         />
                         <View style={styles.requestDetails}>
                           <Text variant="titleMedium" style={styles.requestName}>
-                            {user.name}
+                            {requestUser?.name || request.user_a}
                           </Text>
                           <Text variant="bodyMedium" style={styles.requestRole}>
-                            {user.role}
+                            {requestUser?.role || ''}
                           </Text>
                           <Text variant="bodySmall" style={styles.requestTime}>
-                            {Math.floor((Date.now() - request.createdAt.getTime()) / (24 * 60 * 60 * 1000))} days ago
+                            {Math.floor((Date.now() - new Date(request.created_at).getTime()) / (24 * 60 * 60 * 1000))} days ago
                           </Text>
                         </View>
                       </View>
-
                       <View style={styles.requestActions}>
                         <Button
                           mode="contained"
@@ -335,6 +365,38 @@ export default function FriendsScreen() {
         style={styles.fab}
         onPress={() => console.log('Add friend')}
       />
+
+      <Portal>
+        <Dialog visible={ratingModalVisible} onDismiss={() => setRatingModalVisible(false)}>
+          <Dialog.Title>Rate {ratingTarget?.name}</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>How was your experience?</Paragraph>
+            <TextInput
+              label="Feedback (optional)"
+              value={ratingFeedback}
+              onChangeText={setRatingFeedback}
+              multiline
+              style={{ marginTop: 8 }}
+            />
+            <View style={{ flexDirection: 'row', marginTop: 16, justifyContent: 'center' }}>
+              {[1,2,3,4,5].map(val => (
+                <Button
+                  key={val}
+                  mode={ratingValue === val ? 'contained' : 'outlined'}
+                  onPress={() => setRatingValue(val)}
+                  style={{ marginHorizontal: 2 }}
+                >
+                  {val}
+                </Button>
+              ))}
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setRatingModalVisible(false)}>Cancel</Button>
+            <Button onPress={submitRating}>Submit</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -403,10 +465,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'white',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   friendHeader: {
     marginBottom: 16,

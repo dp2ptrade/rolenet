@@ -11,53 +11,58 @@ export interface User {
   };
   avatar?: string;
   bio?: string;
-  onlineStatus: 'online' | 'offline' | 'busy';
-  isAvailable: boolean;
+  online_status: 'online' | 'offline' | 'away';
+  is_available: boolean;
   rating: number;
-  ratingCount: number;
-  createdAt: Date;
-  lastSeen: Date;
+  rating_count: number;
+  created_at: Date;
+  last_seen: Date;
+  profile_visible: boolean;
+  allow_messages: boolean;
+  allow_pings: boolean;
+  blocked_users: string[];
 }
 
 export interface Ping {
   id: string;
-  senderId: string;
-  receiverId: string;
+  sender_id: string;
+  receiver_id: string;
   message: string;
   status: 'pending' | 'responded' | 'ignored';
-  createdAt: Date;
-  respondedAt?: Date;
+  created_at: Date;
+  responded_at?: Date;
 }
 
 export interface Friend {
   id: string;
-  userA: string;
-  userB: string;
+  user_a: string;
+  user_b: string;
   status: 'pending' | 'accepted' | 'declined';
-  createdAt: Date;
-  acceptedAt?: Date;
+  created_at: Date;
+  accepted_at?: Date;
 }
 
 export interface Call {
   id: string;
-  callerId: string;
-  calleeId: string;
+  caller_id: string;
+  callee_id: string;
   offer?: any;
   answer?: any;
-  iceCandidates: any[];
-  status: 'calling' | 'answered' | 'ended' | 'declined';
-  startTime?: Date;
-  endTime?: Date;
-  createdAt: Date;
+  ice_candidates: any[];
+  status: 'pending' | 'ringing' | 'active' | 'ended' | 'declined' | 'missed';
+  duration?: number;
+  created_at: Date;
+  ended_at?: Date;
 }
 
 export interface Chat {
   id: string;
   participants: string[];
-  lastMessage?: string;
-  lastMessageTime?: Date;
-  unreadCount: { [userId: string]: number };
-  createdAt: Date;
+  last_message?: string;
+  last_message_time?: Date;
+  unread_count: { [userId: string]: number };
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface Message {
@@ -72,12 +77,25 @@ export interface Message {
 
 export interface Rating {
   id: string;
-  raterId: string;
-  ratedUserId: string;
+  rater_id: string;
+  rated_user_id: string;
   rating: number;
   feedback?: string;
   context: 'call' | 'chat' | 'ping';
-  createdAt: Date;
+  created_at: Date;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  type: 'ping' | 'message' | 'friend_request' | 'call';
+  data?: any;
+  sent_at: string;
+  read_at?: string;
+  status: 'sent' | 'delivered' | 'failed';
+  created_at: string;
 }
 
 export const POPULAR_ROLES = [

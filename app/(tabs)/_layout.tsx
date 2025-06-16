@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Search, Activity, Users, User } from 'lucide-react-native';
-import { useTheme } from 'react-native-paper';
+import { Search, Activity, Users, User, Bell } from 'lucide-react-native';
+import { useTheme, Badge } from 'react-native-paper';
+import { useNotificationStore } from '@/stores/useNotificationStore';
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -49,6 +50,34 @@ export default function TabLayout() {
           tabBarIcon: ({ size, color }) => (
             <Users size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ size, color }) => {
+            const { unreadCount } = useNotificationStore();
+            return (
+              <>
+                <Bell size={size} color={color} />
+                {unreadCount > 0 && (
+                  <Badge
+                    style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -10,
+                      backgroundColor: theme.colors.error,
+                      color: 'white',
+                      fontSize: 10,
+                    }}
+                  >
+                    {unreadCount}
+                  </Badge>
+                )}
+              </>
+            );
+          },
         }}
       />
       <Tabs.Screen

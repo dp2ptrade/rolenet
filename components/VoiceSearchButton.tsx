@@ -10,6 +10,7 @@ import Animated, {
   withSequence,
   Easing
 } from 'react-native-reanimated';
+import { Audio } from 'expo-av';
 import { VoiceSearchService } from '@/lib/voiceSearch';
 
 interface VoiceSearchButtonProps {
@@ -62,14 +63,24 @@ export default function VoiceSearchButton({
   const checkMicrophonePermission = async () => {
     if (Platform.OS === 'web') {
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        setHasPermission(true);
+        if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          setHasPermission(true);
+        } else {
+          setHasPermission(false);
+        }
       } catch (error) {
         setHasPermission(false);
       }
     } else {
-      // For native platforms, you would check permissions here
-      setHasPermission(true);
+      // For native platforms, check expo-av permissions
+      try {
+        const { status } = await Audio.requestPermissionsAsync();
+        setHasPermission(status === 'granted');
+      } catch (error) {
+        console.error('Permission check error:', error);
+        setHasPermission(false);
+      }
     }
   };
 
@@ -81,7 +92,7 @@ export default function VoiceSearchButton({
   });
 
   const handleVoiceSearch = async () => {
-    if (disabled || hasPermission === false) return;
+    if (disabled) return;
 
     if (isRecording) {
       // Stop recording
@@ -106,17 +117,32 @@ export default function VoiceSearchButton({
         setIsProcessing(false);
       }
     } else {
-      // Start recording
+      // Start recording - check permissions first
       try {
+        // Re-check permissions before starting
+        if (Platform.OS === 'web') {
+          if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            await navigator.mediaDevices.getUserMedia({ audio: true });
+          } else {
+            throw new Error('Microphone not available in this environment');
+          }
+        } else {
+          const { status } = await Audio.requestPermissionsAsync();
+          if (status !== 'granted') {
+            throw new Error('Microphone permission denied');
+          }
+        }
+        
         await VoiceSearchService.startRecording();
         setIsRecording(true);
         
         // Provide voice feedback
         await VoiceSearchService.speakText('Listening...');
-      } catch (error) {
-        console.error('Failed to start recording:', error);
-        onError('Failed to start voice recording. Please check microphone permissions.');
-      }
+      } catch (error: any) {
+          console.error('Failed to start recording:', error);
+          onError(`Failed to start voice recording: ${error.message || 'Unknown error'}`);
+          setHasPermission(false);
+        }
     }
   };
 

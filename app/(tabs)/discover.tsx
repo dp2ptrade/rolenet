@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, ScrollView, StyleSheet, RefreshControl, Alert, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { 
   Searchbar, 
   Card, 
@@ -10,17 +10,23 @@ import {
   Surface, 
   FAB,
   Snackbar,
-  Portal
+  Portal,
+  Modal,
+  Icon
 } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, Star, Phone, Filter, Sparkles, TrendingUp } from 'lucide-react-native';
+import { MapPin, Star, Phone, Filter, Sparkles, TrendingUp, Tag } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '@/stores/useUserStore';
+import { usePingStore } from '@/stores/usePingStore';
 import { User } from '@/lib/types';
+import { userService } from '@/lib/supabaseService';
 import { SmartSearchEngine, SearchFilters, SearchResult } from '@/lib/searchEngine';
-import { VoiceSearchService, VoiceSearchProcessor } from '@/lib/voiceSearch';
+import { VoiceSearchService } from '@/lib/voiceSearch';
+import { VoiceSearchProcessor } from '@/lib/searchEngine';
 import SearchFiltersModal from '@/components/SearchFilters';
 import VoiceSearchButton from '@/components/VoiceSearchButton';
+import { router } from 'expo-router';
 
 const MOCK_USERS: User[] = [
   {
@@ -32,12 +38,16 @@ const MOCK_USERS: User[] = [
     location: { latitude: 37.7749, longitude: -122.4194, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Passionate educator with 10+ years experience',
-    onlineStatus: 'online',
-    isAvailable: true,
+    online_status: 'online',
+    is_available: true,
     rating: 4.8,
-    ratingCount: 23,
-    createdAt: new Date(),
-    lastSeen: new Date(),
+    rating_count: 23,
+    created_at: new Date(),
+    last_seen: new Date(),
+    profile_visible: true,
+    allow_messages: true,
+    allow_pings: true,
+    blocked_users: [],
   },
   {
     id: '2',
@@ -48,12 +58,16 @@ const MOCK_USERS: User[] = [
     location: { latitude: 37.7849, longitude: -122.4094, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Full-stack developer passionate about clean code',
-    onlineStatus: 'online',
-    isAvailable: true,
-    rating: 4.9,
-    ratingCount: 45,
-    createdAt: new Date(),
-    lastSeen: new Date(),
+    online_status: 'online',
+    is_available: true,
+    rating: 4.6,
+    rating_count: 45,
+    created_at: new Date(),
+    last_seen: new Date(),
+    profile_visible: true,
+    allow_messages: true,
+    allow_pings: true,
+    blocked_users: [],
   },
   {
     id: '3',
@@ -64,12 +78,16 @@ const MOCK_USERS: User[] = [
     location: { latitude: 37.7649, longitude: -122.4294, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/5215024/pexels-photo-5215024.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Family physician with expertise in preventive care',
-    onlineStatus: 'busy',
-    isAvailable: false,
-    rating: 4.7,
-    ratingCount: 67,
-    createdAt: new Date(),
-    lastSeen: new Date(),
+    online_status: 'away',
+    is_available: false,
+    rating: 4.9,
+    rating_count: 67,
+    created_at: new Date(),
+    last_seen: new Date(),
+    profile_visible: true,
+    allow_messages: true,
+    allow_pings: true,
+    blocked_users: [],
   },
   {
     id: '4',
@@ -80,12 +98,16 @@ const MOCK_USERS: User[] = [
     location: { latitude: 37.7549, longitude: -122.4394, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/2182970/pexels-photo-2182970.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Creative designer specializing in user experience',
-    onlineStatus: 'online',
-    isAvailable: true,
-    rating: 4.6,
-    ratingCount: 34,
-    createdAt: new Date(),
-    lastSeen: new Date(),
+    online_status: 'online',
+    is_available: true,
+    rating: 4.7,
+    rating_count: 34,
+    created_at: new Date(),
+    last_seen: new Date(),
+    profile_visible: true,
+    allow_messages: true,
+    allow_pings: true,
+    blocked_users: [],
   },
   {
     id: '5',
@@ -96,26 +118,39 @@ const MOCK_USERS: User[] = [
     location: { latitude: 37.7449, longitude: -122.4494, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/1181690/pexels-photo-1181690.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Professional chef with expertise in healthy cooking',
-    onlineStatus: 'offline',
-    isAvailable: false,
-    rating: 4.9,
-    ratingCount: 56,
-    createdAt: new Date(),
-    lastSeen: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    online_status: 'offline',
+    is_available: false,
+    rating: 4.5,
+    rating_count: 56,
+    created_at: new Date(),
+    last_seen: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    profile_visible: true,
+    allow_messages: true,
+    allow_pings: true,
+    blocked_users: [],
   },
 ];
 
 export default function DiscoverScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [popularRoles, setPopularRoles] = useState<string[]>([]);
+  const [popularTags, setPopularTags] = useState<string[]>([]);
+  const [activeSuggestionTab, setActiveSuggestionTab] = useState<'suggestions' | 'roles' | 'tags'>('suggestions');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [pingModalVisible, setPingModalVisible] = useState(false);
+  const [pingMessage, setPingMessage] = useState('');
+
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   
-  const currentUser = useUserStore((state) => state.currentUser);
+  const currentUser = useUserStore((state) => state.user);
+  const { sendPing } = usePingStore();
 
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
@@ -136,11 +171,117 @@ export default function DiscoverScreen() {
       voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
 
-    performSearch();
+    loadUsers();
   }, []);
 
+  const loadUsers = async (appliedFilters: SearchFilters | null = null) => {
+    try {
+      setLoading(true);
+      const searchParams: any = { limit: 50 };
+
+      // Apply filters if provided or if we have active filters
+      const filtersToApply = appliedFilters || filters;
+      if (filtersToApply.query) {
+        searchParams.query = filtersToApply.query;
+      }
+      if (filtersToApply.roles && filtersToApply.roles.length > 0) {
+        searchParams.roles = filtersToApply.roles;
+      }
+      if (filtersToApply.tags && filtersToApply.tags.length > 0) {
+        searchParams.tags = filtersToApply.tags;
+      }
+      if (filtersToApply.availability === 'available') {
+        searchParams.is_available = true;
+      }
+      if (filtersToApply.rating > 0) {
+        searchParams.min_rating = filtersToApply.rating;
+      }
+      if (filtersToApply.location === 'nearby' && currentUser?.location) {
+        searchParams.latitude = currentUser.location.latitude;
+        searchParams.longitude = currentUser.location.longitude;
+        searchParams.max_distance = filtersToApply.distance;
+      }
+      if (filtersToApply.sortBy) {
+        searchParams.sort_by = filtersToApply.sortBy;
+      }
+
+      const { data: usersData, error } = await userService.searchUsers(searchParams);
+      
+      if (error) {
+        console.error('Error loading users:', error);
+        setSnackbarMessage('Failed to load users from database');
+        setSnackbarVisible(true);
+        if (__DEV__) {
+          console.warn('Using mock data in development mode');
+          setUsers(MOCK_USERS);
+        } else {
+          setUsers([]);
+        }
+      } else if (usersData && usersData.length > 0) {
+        console.log(`Successfully loaded ${usersData.length} users from database`);
+        const filteredUsers = usersData.filter(user => user.id !== currentUser?.id);
+        setUsers(filteredUsers);
+        setSnackbarMessage(`Found ${filteredUsers.length} professionals`);
+        setSnackbarVisible(true);
+        
+        // Extract popular roles and tags for quick filters
+        const roleCounts: { [key: string]: number } = {};
+        const tagCounts: { [key: string]: number } = {};
+        filteredUsers.forEach(user => {
+          roleCounts[user.role] = (roleCounts[user.role] || 0) + 1;
+          user.tags.forEach((tag: string) => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          });
+        });
+        
+        const sortedRoles = Object.entries(roleCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(entry => entry[0])
+          .slice(0, 5);
+        setPopularRoles(sortedRoles);
+        
+        const sortedTags = Object.entries(tagCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(entry => entry[0])
+          .slice(0, 10);
+        setPopularTags(sortedTags);
+      } else {
+        console.warn('No users found in database');
+        setSnackbarMessage('No users found in database');
+        setSnackbarVisible(true);
+        if (__DEV__) {
+          console.warn('Using mock data in development mode');
+          setUsers(MOCK_USERS);
+        } else {
+          setUsers([]);
+        }
+        setPopularRoles([]);
+        setPopularTags([]);
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setSnackbarMessage('Error connecting to database');
+      setSnackbarVisible(true);
+      if (__DEV__) {
+        console.warn('Using mock data in development mode');
+        setUsers(MOCK_USERS);
+      } else {
+        setUsers([]);
+      }
+      setPopularRoles([]);
+      setPopularTags([]);
+    } finally {
+      setLoading(false);
+      if (appliedFilters) {
+        performSearch();
+      }
+    }
+  };
+
   useEffect(() => {
-    performSearch();
+    if (!loading) {
+      loadUsers(filters);
+    }
   }, [filters]);
 
   useEffect(() => {
@@ -153,6 +294,8 @@ export default function DiscoverScreen() {
   }, [searchQuery, users]);
 
   const performSearch = () => {
+    // Since filtering is now done at database level, we can directly use the loaded users as search results
+    // But we still calculate relevance score and distance for display purposes
     const searchFilters = { ...filters, query: searchQuery };
     const userLocation = currentUser?.location;
     
@@ -160,14 +303,11 @@ export default function DiscoverScreen() {
     setSearchResults(results);
   };
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // Simulate API call
-    setTimeout(() => {
-      setRefreshing(false);
-      performSearch();
-    }, 2000);
-  }, []);
+    await loadUsers();
+    setRefreshing(false);
+  }, [currentUser?.id]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -188,14 +328,74 @@ export default function DiscoverScreen() {
     setSnackbarVisible(true);
   };
 
-  const handlePingUser = (userId: string) => {
-    console.log('Ping user:', userId);
-    setSnackbarMessage('Ping sent successfully!');
+  const handleVoiceSearchClick = () => {
+    // Simulate VoiceSearchButton click behavior
+    // In a real implementation, this would trigger the voice search functionality
+    // For now, we'll show a message
+    setSnackbarMessage("Voice search activated. Speak now...");
     setSnackbarVisible(true);
+    // Note: Actual voice search implementation would be triggered here
+    // You might need to integrate with VoiceSearchService directly or show a modal
+  };
+
+  const handlePingUser = (userId: string) => {
+    if (!currentUser?.id) {
+      setSnackbarMessage('Please sign in to send pings');
+      setSnackbarVisible(true);
+      return;
+    }
+
+    setSelectedUserId(userId);
+    setPingMessage('');
+
+    setPingModalVisible(true);
+  };
+
+  // Simple text input handler
+  const handleTextChange = (text: string) => {
+    setPingMessage(text);
+  };
+
+  // Reset input when modal opens for new user
+  useEffect(() => {
+    if (pingModalVisible && selectedUserId) {
+      setPingMessage('');
+    }
+  }, [selectedUserId]);
+
+  const handleSendPing = async () => {
+    if (!currentUser?.id || !selectedUserId || !pingMessage.trim()) {
+      setSnackbarMessage('Please enter a message');
+      setSnackbarVisible(true);
+      return;
+    }
+
+    try {
+      await sendPing(currentUser.id, selectedUserId, pingMessage.trim());
+      setSnackbarMessage('Ping sent successfully!');
+      setSnackbarVisible(true);
+      setPingModalVisible(false);
+      setPingMessage('');
+      setSelectedUserId(null);
+    } catch (error) {
+      console.error('Error sending ping:', error);
+      setSnackbarMessage('Failed to send ping. Please try again.');
+      setSnackbarVisible(true);
+    }
+  };
+
+  const handleCancelPing = () => {
+    setPingModalVisible(false);
+    setPingMessage('');
+
+    setSelectedUserId(null);
   };
 
   const handleViewProfile = (userId: string) => {
-    console.log('View profile:', userId);
+    router.push({
+      pathname: '/public-profile',
+      params: { userId }
+    });
   };
 
   const handleSuggestionPress = (suggestion: string) => {
@@ -207,14 +407,28 @@ export default function DiscoverScreen() {
   };
 
   const handleApplyFilters = () => {
-    performSearch();
     setSnackbarMessage('Filters applied successfully!');
     setSnackbarVisible(true);
+    loadUsers(filters);
+    setShowFilters(false);
   };
 
   const handleResetFilters = () => {
     setSearchQuery('');
     setSuggestions([]);
+    setFilters({
+      query: '',
+      location: 'nearby',
+      roles: [],
+      tags: [],
+      availability: 'all',
+      rating: 0,
+      experience: 'all',
+      distance: 50,
+      sortBy: 'relevance'
+    });
+    setSnackbarMessage('Filters reset');
+    setSnackbarVisible(true);
   };
 
   const getRoleEmoji = (role: string) => {
@@ -249,67 +463,40 @@ export default function DiscoverScreen() {
         colors={['#3B82F6', '#06B6D4']}
         style={styles.header}
       >
-        <Text variant="headlineMedium" style={styles.headerTitle}>
-          Discover Professionals
+        <Text variant="headlineMedium" style={[styles.headerTitle, { textAlign: 'center' }]}>
+          ROLE NET
         </Text>
         <Text variant="bodyMedium" style={styles.headerSubtitle}>
-          AI-powered search with voice commands
+          Discover every profession of people by rule with AI
         </Text>
       </LinearGradient>
 
       <View style={styles.content}>
         <View style={styles.searchContainer}>
           <Searchbar
-            placeholder="Search by role, name, tags, or speak your query..."
+            placeholder="Search by role, name, tags..."
             onChangeText={setSearchQuery}
             value={searchQuery}
             onSubmitEditing={() => handleSearch(searchQuery)}
             style={styles.searchbar}
             icon={() => <Sparkles size={20} color="#6B7280" />}
+            right={(props: { color: string }) => (
+              <View style={styles.searchOptions}>
+                <TouchableOpacity onPress={handleVoiceSearchClick} style={styles.optionIcon}>
+                  <Icon source="microphone" size={20} color={props.color} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.optionIcon}>
+                  <Filter size={20} color={getActiveFiltersCount() > 0 ? "#3B82F6" : props.color} />
+                </TouchableOpacity>
+              </View>
+            )}
           />
           
           <View style={styles.searchActions}>
-            <VoiceSearchButton
-              onTranscript={handleVoiceTranscript}
-              onError={handleVoiceError}
-            />
-            
-            <Button
-              mode="outlined"
-              onPress={() => setShowFilters(true)}
-              icon={({ size, color }) => <Filter size={size} color={color} />}
-              style={[
-                styles.filterButton,
-                getActiveFiltersCount() > 0 && styles.activeFilterButton
-              ]}
-              contentStyle={styles.filterButtonContent}
-            >
-              Filters {getActiveFiltersCount() > 0 && `(${getActiveFiltersCount()})`}
-            </Button>
+            {/* Removed separate Voice Search and Filters buttons */}
           </View>
 
-          {/* Search Suggestions */}
-          {suggestions.length > 0 && (
-            <Surface style={styles.suggestionsContainer} elevation={2}>
-              <Text variant="bodySmall" style={styles.suggestionsTitle}>
-                <TrendingUp size={16} color="#6B7280" /> Smart Suggestions
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.suggestions}>
-                  {suggestions.map((suggestion, index) => (
-                    <Chip
-                      key={index}
-                      onPress={() => handleSuggestionPress(suggestion)}
-                      style={styles.suggestionChip}
-                      icon="lightbulb-outline"
-                    >
-                      {suggestion}
-                    </Chip>
-                  ))}
-                </View>
-              </ScrollView>
-            </Surface>
-          )}
+          {/* Removed standalone suggestions section as it's now integrated with tabs */}
 
           {/* Quick Filters */}
           <View style={styles.quickFilters}>
@@ -341,6 +528,92 @@ export default function DiscoverScreen() {
               Available
             </Chip>
           </View>
+
+          {/* Search Suggestions with Tabs */}
+          {(suggestions.length > 0 || popularRoles.length > 0 || popularTags.length > 0) && (
+            <Surface style={styles.suggestionsContainer} elevation={2}>
+              <View style={styles.tabContainer}>
+                {suggestions.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.tab, activeSuggestionTab === 'suggestions' && styles.activeTab]}
+                    onPress={() => setActiveSuggestionTab('suggestions')}
+                  >
+                    <Text variant="bodySmall" style={[styles.tabText, activeSuggestionTab === 'suggestions' && styles.activeTabText]}>
+                      <TrendingUp size={16} color={activeSuggestionTab === 'suggestions' ? "#3B82F6" : "#6B7280"} /> Smart Suggestions
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {popularRoles.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.tab, activeSuggestionTab === 'roles' && styles.activeTab]}
+                    onPress={() => setActiveSuggestionTab('roles')}
+                  >
+                    <Text variant="bodySmall" style={[styles.tabText, activeSuggestionTab === 'roles' && styles.activeTabText]}>
+                      <TrendingUp size={16} color={activeSuggestionTab === 'roles' ? "#3B82F6" : "#6B7280"} /> Popular Roles
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {popularTags.length > 0 && (
+                  <TouchableOpacity
+                    style={[styles.tab, activeSuggestionTab === 'tags' && styles.activeTab]}
+                    onPress={() => setActiveSuggestionTab('tags')}
+                  >
+                    <Text variant="bodySmall" style={[styles.tabText, activeSuggestionTab === 'tags' && styles.activeTabText]}>
+                      <Tag size={16} color={activeSuggestionTab === 'tags' ? "#3B82F6" : "#6B7280"} /> Popular Tags
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.suggestions}>
+                  {activeSuggestionTab === 'suggestions' && suggestions.map((suggestion, index) => (
+                    <Chip
+                      key={index}
+                      onPress={() => handleSuggestionPress(suggestion)}
+                      style={styles.suggestionChip}
+                      icon="lightbulb-outline"
+                    >
+                      {suggestion}
+                    </Chip>
+                  ))}
+                  {activeSuggestionTab === 'roles' && popularRoles.map((role, index) => (
+                    <Chip
+                      key={index}
+                      onPress={() => setFilters(prev => ({ 
+                        ...prev, 
+                        roles: prev.roles.includes(role) ? prev.roles.filter(r => r !== role) : [...prev.roles, role]
+                      }))}
+                      selected={filters.roles.includes(role)}
+                      style={styles.popularChip}
+                    >
+                      {role}
+                    </Chip>
+                  ))}
+                  {activeSuggestionTab === 'tags' && popularTags.map((tag, index) => (
+                    <Chip
+                      key={index}
+                      onPress={() => setFilters(prev => ({ 
+                        ...prev, 
+                        tags: prev.tags.includes(tag) ? prev.tags.filter(t => t !== tag) : [...prev.tags, tag]
+                      }))}
+                      selected={filters.tags.includes(tag)}
+                      style={styles.popularChip}
+                    >
+                      {tag}
+                    </Chip>
+                  ))}
+                </View>
+              </ScrollView>
+            </Surface>
+          )}
+
+          {/* Loading Indicator */}
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Searching for professionals...</Text>
+            </View>
+          )}
         </View>
 
         {/* Search Results */}
@@ -389,7 +662,7 @@ export default function DiscoverScreen() {
                         <View style={styles.statusIndicator}>
                           <View style={[
                             styles.statusDot,
-                            { backgroundColor: user.onlineStatus === 'online' ? '#10B981' : '#EF4444' }
+                            { backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444' }
                           ]} />
                         </View>
                       </View>
@@ -411,7 +684,7 @@ export default function DiscoverScreen() {
                         <View style={styles.ratingRow}>
                           <Star size={16} color="#F59E0B" fill="#F59E0B" />
                           <Text variant="bodySmall" style={styles.rating}>
-                            {user.rating} ({user.ratingCount} reviews)
+                            {user.rating} ({user.rating_count} reviews)
                           </Text>
                           {relevanceScore > 80 && (
                             <Chip compact style={styles.relevanceChip}>
@@ -480,6 +753,71 @@ export default function DiscoverScreen() {
         onReset={handleResetFilters}
       />
 
+      {/* Ping Message Modal */}
+      <Portal>
+        <Modal
+          visible={pingModalVisible}
+          onDismiss={handleCancelPing}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Card style={styles.pingModal}>
+            <Card.Content style={styles.pingModalContent}>
+              <View style={styles.pingModalHeader}>
+                <View style={styles.pingIconContainer}>
+                  <Icon source="send" size={24} color="#3B82F6" />
+                </View>
+                <Text variant="headlineSmall" style={styles.pingModalTitle}>
+                  Send Connection Request
+                </Text>
+                <Text variant="bodyMedium" style={styles.pingModalSubtitle}>
+                  Send a message to connect with this professional
+                </Text>
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Your message</Text>
+                <TextInput
+                  value={pingMessage}
+                  onChangeText={handleTextChange}
+                  multiline
+                  numberOfLines={4}
+                  placeholder="Write your ping message here..."
+                  style={styles.pingInput}
+                  maxLength={500}
+                  autoCapitalize="sentences"
+                  textAlignVertical="top"
+                />
+                <View style={styles.characterCount}>
+                  <Text variant="bodySmall" style={styles.characterCountText}>
+                    {pingMessage.length}/500 characters
+                  </Text>
+                </View>
+              </View>
+            </Card.Content>
+            
+            <Card.Actions style={styles.pingModalActions}>
+              <Button 
+                onPress={handleCancelPing}
+                style={styles.cancelButton}
+                labelStyle={styles.cancelButtonLabel}
+              >
+                Cancel
+              </Button>
+              <Button 
+                mode="contained" 
+                onPress={handleSendPing}
+                disabled={!pingMessage.trim() || pingMessage.length > 500}
+                style={[styles.sendButton, (!pingMessage.trim() || pingMessage.length > 500) && styles.sendButtonDisabled]}
+                labelStyle={styles.sendButtonLabel}
+                icon="send"
+              >
+                Send Request
+              </Button>
+            </Card.Actions>
+          </Card>
+        </Modal>
+      </Portal>
+
       {/* Snackbar for notifications */}
       <Portal>
         <Snackbar
@@ -523,16 +861,20 @@ const styles = StyleSheet.create({
   searchbar: {
     backgroundColor: 'white',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
     marginBottom: 12,
   },
   searchActions: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 12,
+  },
+  searchOptions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionIcon: {
+    padding: 8,
   },
   filterButton: {
     flex: 1,
@@ -551,11 +893,29 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-  suggestionsTitle: {
-    color: '#6B7280',
-    marginBottom: 8,
+  tabContainer: {
     flexDirection: 'row',
+    marginBottom: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F1F5F9',
+  },
+  tab: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#3B82F6',
+  },
+  tabText: {
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   suggestions: {
     flexDirection: 'row',
@@ -585,6 +945,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
+  // Removed as no longer needed with tabbed interface
+  popularChip: {
+    backgroundColor: '#F8FAFC',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#374151',
+  },
   emptyCard: {
     backgroundColor: 'white',
     marginTop: 40,
@@ -606,10 +981,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'white',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
   },
   userHeader: {
     flexDirection: 'row',
@@ -703,5 +1075,87 @@ const styles = StyleSheet.create({
   },
   snackbar: {
     backgroundColor: '#374151',
+  },
+  modalContainer: {
+    padding: 20,
+  },
+  pingModal: {
+    backgroundColor: 'white',
+  },
+  pingModalContent: {
+    padding: 0,
+  },
+  pingModalHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  pingIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  pingModalTitle: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#1F2937',
+  },
+  pingModalSubtitle: {
+    textAlign: 'center',
+    color: '#6B7280',
+  },
+  messageInputContainer: {
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#374151',
+  },
+  pingInput: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#FFFFFF',
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  characterCount: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+  },
+  characterCountText: {
+    color: '#6B7280',
+  },
+  pingModalActions: {
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  cancelButton: {
+    borderColor: '#D1D5DB',
+  },
+  cancelButtonLabel: {
+    color: '#6B7280',
+  },
+  sendButton: {
+    backgroundColor: '#3B82F6',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  sendButtonLabel: {
+    color: 'white',
   },
 });

@@ -8,8 +8,8 @@ import { useUserStore } from '@/stores/useUserStore';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
-  const { currentUser, setCurrentUser, setAuthenticated } = useUserStore();
-  const [isAvailable, setIsAvailable] = useState(currentUser?.isAvailable || false);
+  const { user: currentUser, setCurrentUser, setAuthenticated, signOut } = useUserStore();
+  const [isAvailable, setIsAvailable] = useState(currentUser?.is_available || false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   // Mock user data if no current user
@@ -22,27 +22,24 @@ export default function ProfileScreen() {
     location: { latitude: 37.7749, longitude: -122.4194, address: 'San Francisco, CA' },
     avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
     bio: 'Passionate software engineer with 5+ years of experience building scalable applications.',
-    onlineStatus: 'online' as const,
-    isAvailable: true,
+    online_status: 'online' as const,
+    is_available: true,
     rating: 4.8,
-    ratingCount: 32,
-    createdAt: new Date(),
-    lastSeen: new Date(),
+    rating_count: 32,
+    created_at: new Date(),
+    last_seen: new Date(),
   };
 
   const handleEditProfile = () => {
-    console.log('Edit profile');
-    // TODO: Navigate to edit profile screen
+    router.push('/edit-profile');
   };
 
   const handleViewProfile = () => {
-    console.log('View public profile');
-    // TODO: Navigate to public profile view
+    router.push({ pathname: '/public-profile', params: { userId: user.id } });
   };
 
   const handleSettings = () => {
-    console.log('Open settings');
-    // TODO: Navigate to settings screen
+    router.push('/settings');
   };
 
   const handleSignOut = () => {
@@ -54,13 +51,12 @@ export default function ProfileScreen() {
         { 
           text: 'Sign Out', 
           style: 'destructive', 
-          onPress: () => {
-            // Clear user data and authentication state
-            setCurrentUser(null);
-            setAuthenticated(false);
+          onPress: async () => {
+            // Sign out using the store method
+            await signOut();
             
-            // Navigate back to onboarding/login
-            router.replace('/onboarding');
+            // Navigate back to sign in
+            router.replace('/auth/signin');
           }
         },
       ]
@@ -102,7 +98,7 @@ export default function ProfileScreen() {
               />
               <View style={[
                 styles.statusDot,
-                { backgroundColor: user.onlineStatus === 'online' ? '#10B981' : '#EF4444' }
+                { backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444' }
               ]} />
             </View>
             
@@ -121,7 +117,7 @@ export default function ProfileScreen() {
               <View style={styles.ratingRow}>
                 <Star size={16} color="#FFD700" fill="#FFD700" />
                 <Text variant="bodyMedium" style={styles.rating}>
-                  {user.rating} ({user.ratingCount} reviews)
+                  {user.rating} ({user.rating_count} reviews)
                 </Text>
               </View>
             </View>
@@ -366,10 +362,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'white',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
   },
   sectionTitle: {
     fontWeight: 'bold',

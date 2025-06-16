@@ -1,16 +1,25 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Card, Avatar, Button, Text, Chip } from 'react-native-paper';
-import { Star, MapPin } from 'lucide-react-native';
+import { Star, MapPin, UserPlus, UserMinus } from 'lucide-react-native';
 import { User } from '@/lib/types';
+import { useFriendStore } from '@/stores/useFriendStore';
+import { useUserStore } from '@/stores/useUserStore';
 
 interface UserCardProps {
   user: User;
   onPing: (userId: string) => void;
   onViewProfile: (userId: string) => void;
+  onSendFriendRequest?: (userId: string) => void;
+  onUnfriend?: (userId: string) => void;
 }
 
-export default function UserCard({ user, onPing, onViewProfile }: UserCardProps) {
+export default function UserCard({ user, onPing, onViewProfile, onSendFriendRequest, onUnfriend }: UserCardProps) {
+  const { user: currentUser } = useUserStore();
+  const { friends } = useFriendStore();
+  const isCurrentUser = currentUser?.id === user.id;
+  const isFriend = friends.some(friend => friend.id === user.id);
+
   const getRoleEmoji = (role: string) => {
     const roleEmojis: { [key: string]: string } = {
       'Teacher': '👩‍🏫',
@@ -37,7 +46,7 @@ export default function UserCard({ user, onPing, onViewProfile }: UserCardProps)
             <View style={styles.statusIndicator}>
               <View style={[
                 styles.statusDot,
-                { backgroundColor: user.onlineStatus === 'online' ? '#10B981' : '#EF4444' }
+                { backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444' }
               ]} />
             </View>
           </View>
@@ -59,7 +68,7 @@ export default function UserCard({ user, onPing, onViewProfile }: UserCardProps)
             <View style={styles.ratingRow}>
               <Star size={16} color="#F59E0B" fill="#F59E0B" />
               <Text variant="bodySmall" style={styles.rating}>
-                {user.rating} ({user.ratingCount} reviews)
+                {user.rating} ({user.rating_count} reviews)
               </Text>
             </View>
             
@@ -95,6 +104,28 @@ export default function UserCard({ user, onPing, onViewProfile }: UserCardProps)
           >
             Ping
           </Button>
+          {!isCurrentUser && onSendFriendRequest && !isFriend && (
+            <Button
+              mode="contained-tonal"
+              onPress={() => onSendFriendRequest(user.id)}
+              style={styles.friendRequestButton}
+              contentStyle={styles.buttonContent}
+              icon={({ size, color }) => <UserPlus size={size} color={color} />}
+            >
+              Friend Request
+            </Button>
+          )}
+          {!isCurrentUser && onUnfriend && isFriend && (
+            <Button
+              mode="contained-tonal"
+              onPress={() => onUnfriend(user.id)}
+              style={styles.friendRequestButton}
+              contentStyle={styles.buttonContent}
+              icon={({ size, color }) => <UserMinus size={size} color={color} />}
+            >
+              Unfriend
+            </Button>
+          )}
           <Button
             mode="outlined"
             onPress={() => onViewProfile(user.id)}
@@ -114,10 +145,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'white',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
   },
   header: {
     flexDirection: 'row',
@@ -192,13 +220,20 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   pingButton: {
     flex: 1,
+    minWidth: 100,
+  },
+  friendRequestButton: {
+    flex: 1,
+    minWidth: 100,
   },
   profileButton: {
     flex: 1,
+    minWidth: 100,
   },
   buttonContent: {
     paddingVertical: 4,

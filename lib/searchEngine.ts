@@ -90,10 +90,10 @@ export class SmartSearchEngine {
 
     // Availability scoring
     if (filters.availability !== 'all') {
-      if (filters.availability === 'available' && user.isAvailable) {
+      if (filters.availability === 'available' && user.is_available) {
         score += 25;
         matchedFields.push('availability');
-      } else if (filters.availability === 'busy' && !user.isAvailable) {
+      } else if (filters.availability === 'busy' && !user.is_available) {
         score += 25;
         matchedFields.push('availability');
       }
@@ -106,7 +106,7 @@ export class SmartSearchEngine {
     }
 
     // Online status bonus
-    if (user.onlineStatus === 'online') {
+    if (user.online_status === 'online') {
       score += 15;
       matchedFields.push('online');
     }
@@ -118,7 +118,7 @@ export class SmartSearchEngine {
     }
 
     // Experience level scoring (based on rating count as proxy)
-    const experienceLevel = this.getExperienceLevel(user.ratingCount);
+    const experienceLevel = this.getExperienceLevel(user.rating_count);
     if (filters.experience !== 'all' && experienceLevel === filters.experience) {
       score += 30;
       matchedFields.push('experience');
@@ -127,9 +127,9 @@ export class SmartSearchEngine {
     return score;
   }
 
-  private static getExperienceLevel(ratingCount: number): 'junior' | 'mid' | 'senior' {
-    if (ratingCount < 10) return 'junior';
-    if (ratingCount < 50) return 'mid';
+  private static getExperienceLevel(rating_count: number): 'junior' | 'mid' | 'senior' {
+    if (rating_count < 10) return 'junior';
+    if (rating_count < 50) return 'mid';
     return 'senior';
   }
 
@@ -198,7 +198,7 @@ export class SmartSearchEngine {
           }
           return b.relevanceScore - a.relevanceScore;
         case 'recent':
-          return b.user.lastSeen.getTime() - a.user.lastSeen.getTime();
+          return b.user.last_seen.getTime() - a.user.last_seen.getTime();
         case 'relevance':
         default:
           return b.relevanceScore - a.relevanceScore;

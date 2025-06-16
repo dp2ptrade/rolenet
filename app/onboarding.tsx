@@ -7,6 +7,7 @@ import { MapPin, User, Tag, ArrowRight, Globe } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { useUserStore } from '@/stores/useUserStore';
 import { POPULAR_ROLES, POPULAR_TAGS } from '@/lib/types';
+import { AuthService, UserService } from '@/lib/supabaseService';
 import * as Location from 'expo-location';
 
 export default function OnboardingScreen() {
@@ -117,24 +118,53 @@ export default function OnboardingScreen() {
     try {
       const finalRole = selectedRole === 'Custom' ? customRole : selectedRole;
       const finalTags = [...selectedTags];
-
-      // TODO: Create user in Firebase
-      const userData = {
-        id: 'temp-user-id', // Replace with actual user ID from Firebase
+      
+      // Get current session to get user ID
+      const { session, error: sessionError } = await AuthService.getCurrentSession();
+      
+      if (sessionError || !session?.user) {
+        Alert.alert('Error', 'Please sign in first to complete onboarding.');
+        router.replace('/auth/signin');
+        return;
+      }
+      
+      // Check if user profile already exists
+      const { data: existingProfile, error: profileCheckError } = await UserService.getUserProfile(session.user.id);
+      
+      // Create user profile data
+      const profileData = {
         name,
-        email: 'user@example.com', // Replace with actual email
         role: finalRole,
         tags: finalTags,
         location: location || { latitude: 0, longitude: 0, address: 'Unknown' },
-        avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
         bio: '',
-        onlineStatus: 'online' as const,
-        isAvailable: true,
-        rating: 5.0,
-        ratingCount: 0,
-        createdAt: new Date(),
-        lastSeen: new Date(),
+        avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
+        online_status: 'online' as const,
+        is_available: true,
+        rating: 0,
+        rating_count: 0,
+        email: session.user.email,
       };
+      
+      let userData, profileError;
+      
+      if (existingProfile && !profileCheckError) {
+        // Update existing profile
+        const result = await UserService.updateUserProfile(session.user.id, profileData);
+        userData = result.data;
+        profileError = result.error;
+      } else {
+        // Create new profile (only if profile doesn't exist or there was an error checking)
+        const result = await UserService.createUserProfile(session.user.id, profileData);
+        userData = result.data;
+        profileError = result.error;
+      }
+      
+      if (profileError) {
+        console.error('Error saving user profile:', profileError);
+        Alert.alert('Error', 'Failed to save profile. Please try again.');
+        return;
+      }
 
       setCurrentUser(userData);
       setAuthenticated(true);
@@ -518,6 +548,13 @@ const styles = StyleSheet.create({
   },
   tagline: {
     color: 'rgba(255, 255, 255, 0.8)',
+  },
+  introduction: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginTop: 16,
+    paddingHorizontal: 20,
+    lineHeight: 22,
   },
   progressContainer: {
     alignItems: 'center',

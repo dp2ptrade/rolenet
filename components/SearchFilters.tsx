@@ -7,12 +7,12 @@ import {
   Text, 
   Button, 
   Chip, 
-  Slider, 
   Switch, 
   List,
   Divider,
   Surface
 } from 'react-native-paper';
+import Slider from '@react-native-community/slider';
 import { X, Filter, Star, MapPin, Clock, Briefcase } from 'lucide-react-native';
 import { SearchFilters } from '@/lib/searchEngine';
 import { POPULAR_ROLES, POPULAR_TAGS } from '@/lib/types';
@@ -161,11 +161,11 @@ export default function SearchFiltersModal({
                       minimumValue={1}
                       maximumValue={200}
                       value={localFilters.distance}
-                      onValueChange={(value) => updateFilter('distance', Math.round(value))}
+                      onValueChange={(value: number) => updateFilter('distance', Math.round(value))}
                       step={1}
-                      thumbStyle={styles.sliderThumb}
-                      trackStyle={styles.sliderTrack}
-                      minimumTrackTintColor="#3B82F6"
+                      thumbTintColor="#007AFF"
+                       minimumTrackTintColor="#3B82F6"
+                       maximumTrackTintColor="#E5E5E5"
                     />
                   </View>
                 )}
@@ -282,11 +282,11 @@ export default function SearchFiltersModal({
                     minimumValue={0}
                     maximumValue={5}
                     value={localFilters.rating}
-                    onValueChange={(value) => updateFilter('rating', Math.round(value * 2) / 2)}
+                    onValueChange={(value: number) => updateFilter('rating', Math.round(value * 2) / 2)}
                     step={0.5}
-                    thumbStyle={styles.sliderThumb}
-                    trackStyle={styles.sliderTrack}
-                    minimumTrackTintColor="#F59E0B"
+                    thumbTintColor="#007AFF"
+                     minimumTrackTintColor="#F59E0B"
+                     maximumTrackTintColor="#E5E5E5"
                   />
                 </View>
               </View>
