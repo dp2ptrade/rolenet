@@ -1,161 +1,85 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, FlatList, Animated, Dimensions, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, ScrollView, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Text, Button } from 'react-native-paper';
+import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width } = Dimensions.get('window');
-
-const slides = [
-  {
-    id: 1,
-    title: 'Welcome to RoleNet',
-    subtitle: 'Every Role. One Network.',
-    description: 'Connect with professionals across diverse fields in one unified platform.',
-    image: require('../assets/images/icon.png'),
-  },
-  {
-    id: 2,
-    title: 'Discover & Connect',
-    subtitle: 'Find the right expertise',
-    description: 'Search for professionals by role, tags, or location to build meaningful connections.',
-    image: require('../assets/images/icon.png'),
-  },
-  {
-    id: 3,
-    title: 'Real-Time Collaboration',
-    subtitle: 'Communicate instantly',
-    description: 'Engage through chats, calls, and pings with seamless WebRTC integration.',
-    image: require('../assets/images/icon.png'),
-  },
-  {
-    id: 4,
-    title: 'Our Vision',
-    subtitle: 'Bridging professional gaps',
-    description: 'We aim to create a world where every professional role is accessible within one network.',
-    image: require('../assets/images/icon.png'),
-  },
-];
-
-interface SlideItem {
-  id: number;
-  title: string;
-  subtitle: string;
-  description: string;
-  image: any;
-}
-
-const Slide = ({ item, index, scrollX }: { item: SlideItem; index: number; scrollX: Animated.Value }) => {
-  const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-  const translateX = scrollX.interpolate({
-    inputRange,
-    outputRange: [-width * 0.1, 0, width * 0.1],
-  });
-  const opacity = scrollX.interpolate({
-    inputRange,
-    outputRange: [0.7, 1, 0.7],
-  });
-
-  return (
-    <Animated.View style={[styles.slide, { transform: [{ translateX }], opacity }]}>
-      <View style={styles.imageContainer}>
-        {/* Placeholder for image or icon */}
-        <View style={styles.iconPlaceholder}>
-          <Text style={styles.iconText}>RN</Text>
-        </View>
-      </View>
-      <Text variant="headlineLarge" style={styles.title}>
-        {item.title}
-      </Text>
-      <Text variant="titleMedium" style={styles.subtitle}>
-        {item.subtitle}
-      </Text>
-      <Text variant="bodyLarge" style={styles.description}>
-        {item.description}
-      </Text>
-    </Animated.View>
-  );
-};
-
-export default function WelcomeGuideScreen() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<FlatList<SlideItem>>(null);
-
-  const handleNext = () => {
-    if (currentIndex < slides.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      completeGuide();
-    }
-  };
-
-  const handleSkip = async () => {
+const WelcomeGuideScreen = () => {
+  const handleGetStarted = async () => {
     await AsyncStorage.setItem('hasSeenWelcomeGuide', 'true');
     router.replace('/auth/signin');
   };
-
-  const completeGuide = async () => {
-    await AsyncStorage.setItem('hasSeenWelcomeGuide', 'true');
-    router.replace('/auth/signin');
-  };
-
-  const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as any;
-  const onScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: true }
-  );
-
-  const renderItem = ({ item, index }: { item: SlideItem; index: number }) => <Slide item={item} index={index} scrollX={scrollX} />;
 
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={['#3B82F6', '#06B6D4']} style={styles.gradient}>
-        <AnimatedFlatList
-          ref={flatListRef}
-          data={slides}
-          renderItem={renderItem}
-          keyExtractor={(item: SlideItem) => item.id.toString()}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onScroll={onScroll}
-          bounces={false}
-          scrollEventThrottle={16}
-        />
-        <View style={styles.pagination}>
-          {slides.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                index === currentIndex && styles.activeDot,
-              ]}
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <Image
+              source={require('../assets/images/icon.png')}
+              style={styles.logo}
+              resizeMode="contain"
             />
-          ))}
-        </View>
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-          <Button
-            mode="contained"
-            onPress={handleNext}
-            style={styles.nextButton}
-            buttonColor="white"
-            textColor="#3B82F6"
-            icon={currentIndex === slides.length - 1 ? undefined : "arrow-right"}
-          >
-            {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
-          </Button>
-        </View>
+            <Text style={styles.title}>Welcome to RoleNet</Text>
+            <Text style={styles.subtitle}>Every Role. One Network.</Text>
+          </View>
+
+          <View style={styles.content}>
+            <Card style={styles.card} elevation={3}>
+              <Card.Content>
+                <Title style={styles.cardTitle}>Connect with Professionals</Title>
+                <Paragraph style={styles.cardDescription}>
+                  Join a unified platform to connect with experts across diverse fields. Build your network and collaborate seamlessly.
+                </Paragraph>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.card} elevation={3}>
+              <Card.Content>
+                <Title style={styles.cardTitle}>Discover & Connect</Title>
+                <Paragraph style={styles.cardDescription}>
+                  Search for professionals by role, tags, or location to find the right expertise and build meaningful connections.
+                </Paragraph>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.card} elevation={3}>
+              <Card.Content>
+                <Title style={styles.cardTitle}>Real-Time Collaboration</Title>
+                <Paragraph style={styles.cardDescription}>
+                  Engage through instant chats, calls, and pings with seamless WebRTC integration for effective communication.
+                </Paragraph>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.card} elevation={3}>
+              <Card.Content>
+                <Title style={styles.cardTitle}>Our Vision</Title>
+                <Paragraph style={styles.cardDescription}>
+                  We aim to create a world where every professional role is accessible within one network, bridging professional gaps.
+                </Paragraph>
+              </Card.Content>
+            </Card>
+          </View>
+
+          <View style={styles.footer}>
+            <Button
+              mode="contained"
+              onPress={handleGetStarted}
+              style={styles.getStartedButton}
+              buttonColor="white"
+              textColor="#3B82F6"
+            >
+              Get Started
+            </Button>
+          </View>
+        </ScrollView>
       </LinearGradient>
     </SafeAreaView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -164,87 +88,65 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  slide: {
-    width: width,
+  scrollContent: {
+    flexGrow: 1,
     padding: 20,
-    justifyContent: 'center',
+    paddingBottom: 40,
+  },
+  header: {
     alignItems: 'center',
+    marginBottom: 40,
+    marginTop: 20,
   },
-  imageContainer: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  iconPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconText: {
-    fontSize: 50,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  title: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  logo: {
+    width: 100,
+    height: 100,
     marginBottom: 10,
   },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+  },
   subtitle: {
+    fontSize: 18,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
+    marginTop: 5,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  card: {
     marginBottom: 20,
-  },
-  description: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    lineHeight: 22,
-  },
-  pagination: {
-    flexDirection: 'row',
-    position: 'absolute',
-    bottom: 80,
-    alignSelf: 'center',
-  },
-  dot: {
-    height: 10,
-    width: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    marginHorizontal: 5,
-    borderRadius: 5,
-  },
-  activeDot: {
+    borderRadius: 12,
     backgroundColor: 'white',
-    width: 20,
   },
-  buttonsContainer: {
-    position: 'absolute',
-    bottom: 20,
-    width: '100%',
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  cardTitle: {
+    color: '#3B82F6',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  cardDescription: {
+    color: '#4B5563',
+    fontSize: 16,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  footer: {
+    marginTop: 30,
     alignItems: 'center',
   },
-  skipButton: {
-    padding: 10,
-  },
-  skipText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 16,
-  },
-  nextButton: {
-    minWidth: 120,
+  getStartedButton: {
+    width: '80%',
+    paddingVertical: 10,
     borderRadius: 30,
-    paddingHorizontal: 20,
   },
 });
+
+export default WelcomeGuideScreen;
