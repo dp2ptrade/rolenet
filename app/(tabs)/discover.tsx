@@ -466,9 +466,9 @@ export default function DiscoverScreen() {
         <Text variant="headlineMedium" style={[styles.headerTitle, { textAlign: 'center' }]}>
           ROLE NET
         </Text>
-        <Text variant="bodyMedium" style={styles.headerSubtitle}>
-          Discover every profession of people by rules
-        </Text>
+        {/* <Text variant="bodyMedium" style={styles.headerSubtitle}> 
+          Discover every profession of people by rule
+         </Text>  */}
       </LinearGradient>
 
       <View style={styles.content}>
@@ -498,7 +498,36 @@ export default function DiscoverScreen() {
 
           {/* Removed standalone suggestions section as it's now integrated with tabs */}
 
-
+          {/* Quick Filters */}
+          <View style={styles.quickFilters}>
+            {/* <Chip
+              selected={filters.location === 'nearby'}
+              onPress={() => setFilters(prev => ({ ...prev, location: 'nearby' }))}
+              icon="map-marker"
+              style={styles.quickFilterChip}
+            >
+              Nearby
+            </Chip> */}
+            {/* <Chip
+              selected={filters.location === 'global'}
+              onPress={() => setFilters(prev => ({ ...prev, location: 'global' }))}
+              icon="earth"
+              style={styles.quickFilterChip}
+            >
+              Global
+            </Chip> */}
+            {/* <Chip
+              selected={filters.availability === 'available'}
+              onPress={() => setFilters(prev => ({ 
+                ...prev, 
+                availability: prev.availability === 'available' ? 'all' : 'available' 
+              }))}
+              icon="account-check"
+              style={styles.quickFilterChip}
+            >
+              Available
+            </Chip> */}
+          </View>
 
           {/* Search Suggestions with Tabs */}
           {(suggestions.length > 0 || popularRoles.length > 0 || popularTags.length > 0) && (
@@ -810,7 +839,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    padding: 24,
+    padding: 20,
     paddingTop: 16,
   },
   headerTitle: {
@@ -827,13 +856,13 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginTop: -20,
-    marginBottom: 16,
+    marginBottom: 4,
   },
   searchbar: {
     backgroundColor: 'white',
     elevation: 4,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    marginBottom: 12,
+    boxShadow: '0px 2px 4px rgba(88, 86, 86, 0.1)',
+    marginBottom: 2,
   },
   searchActions: {
     flexDirection: 'row',
@@ -866,7 +895,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 4,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#F1F5F9',

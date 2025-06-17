@@ -147,6 +147,7 @@ export default function WelcomeGuideScreen() {
             style={styles.nextButton}
             buttonColor="white"
             textColor="#3B82F6"
+            icon={currentIndex === slides.length - 1 ? undefined : "arrow-right"}
           >
             {currentIndex === slides.length - 1 ? 'Get Started' : 'Next'}
           </Button>
@@ -243,5 +244,7 @@ const styles = StyleSheet.create({
   },
   nextButton: {
     minWidth: 120,
+    borderRadius: 30,
+    paddingHorizontal: 20,
   },
 });
