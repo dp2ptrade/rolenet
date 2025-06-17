@@ -498,36 +498,7 @@ export default function DiscoverScreen() {
 
           {/* Removed standalone suggestions section as it's now integrated with tabs */}
 
-           {/* Quick Filters */}
-          <View style={styles.quickFilters}>
-            {/* <Chip
-              selected={filters.location === 'nearby'}
-              onPress={() => setFilters(prev => ({ ...prev, location: 'nearby' }))}
-              icon="map-marker"
-              style={styles.quickFilterChip}
-            >
-              Nearby
-            </Chip> */}
-            {/* <Chip
-              selected={filters.location === 'global'}
-              onPress={() => setFilters(prev => ({ ...prev, location: 'global' }))}
-              icon="earth"
-              style={styles.quickFilterChip}
-            >
-              Global
-            </Chip> */}
-            {/* <Chip
-              selected={filters.availability === 'available'}
-              onPress={() => setFilters(prev => ({ 
-                ...prev, 
-                availability: prev.availability === 'available' ? 'all' : 'available' 
-              }))}
-              icon="account-check"
-              style={styles.quickFilterChip}
-            >
-              Available
-            </Chip> */}
-          </View>
+
 
           {/* Search Suggestions with Tabs */}
           {(suggestions.length > 0 || popularRoles.length > 0 || popularTags.length > 0) && (
