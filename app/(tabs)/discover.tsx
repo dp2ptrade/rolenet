@@ -467,7 +467,7 @@ export default function DiscoverScreen() {
           ROLE NET
         </Text>
         <Text variant="bodyMedium" style={styles.headerSubtitle}>
-          Discover every profession of people by rule with AI
+          Discover every profession of people by rules
         </Text>
       </LinearGradient>
 
@@ -498,25 +498,25 @@ export default function DiscoverScreen() {
 
           {/* Removed standalone suggestions section as it's now integrated with tabs */}
 
-          {/* Quick Filters */}
+           {/* Quick Filters */}
           <View style={styles.quickFilters}>
-            <Chip
+            {/* <Chip
               selected={filters.location === 'nearby'}
               onPress={() => setFilters(prev => ({ ...prev, location: 'nearby' }))}
               icon="map-marker"
               style={styles.quickFilterChip}
             >
               Nearby
-            </Chip>
-            <Chip
+            </Chip> */}
+            {/* <Chip
               selected={filters.location === 'global'}
               onPress={() => setFilters(prev => ({ ...prev, location: 'global' }))}
               icon="earth"
               style={styles.quickFilterChip}
             >
               Global
-            </Chip>
-            <Chip
+            </Chip> */}
+            {/* <Chip
               selected={filters.availability === 'available'}
               onPress={() => setFilters(prev => ({ 
                 ...prev, 
@@ -526,7 +526,7 @@ export default function DiscoverScreen() {
               style={styles.quickFilterChip}
             >
               Available
-            </Chip>
+            </Chip> */}
           </View>
 
           {/* Search Suggestions with Tabs */}
