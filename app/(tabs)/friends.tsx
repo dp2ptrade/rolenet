@@ -234,7 +234,7 @@ export default function FriendsScreen() {
                         <View style={styles.avatarContainer}>
                           <Avatar.Image 
                             size={60} 
-                            source={{ uri: friend.avatar || '' }} 
+                            source={{ uri: friend.avatar || undefined }} 
                           />
                           <View style={[
                             styles.statusDot,
@@ -319,7 +319,7 @@ export default function FriendsScreen() {
                       <View style={styles.requestHeader}>
                         <Avatar.Image 
                           size={50} 
-                          source={{ uri: requestUser?.avatar || '' }}
+                          source={{ uri: requestUser?.avatar || undefined }}
                         />
                         <View style={styles.requestDetails}>
                           <Text variant="titleMedium" style={styles.requestName}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Alert, Animated } from 'react-native';
+import { View, StyleSheet, Alert, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Button, Avatar, Surface, IconButton, ProgressBar } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -174,12 +174,12 @@ export default function CallScreen() {
         Animated.timing(pulseAnim, {
           toValue: 1.1,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(pulseAnim, {
           toValue: 1,
           duration: 1000,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     ).start();
@@ -197,7 +197,7 @@ export default function CallScreen() {
             <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
               <Avatar.Image
                 size={120}
-                source={userAvatar ? { uri: userAvatar as string } : require('../assets/images/icon.png')}
+                source={userAvatar ? { uri: userAvatar as string } : require('../assets/images/rolenet-logo.png')}
                 style={styles.avatar}
               />
             </Animated.View>

@@ -9,6 +9,7 @@ interface ChatState {
   isLoading: boolean;
   subscription: any;
   currentSubscriptionChatId?: string; // Track the current chat ID we're subscribed to
+  unreadChatsCount: number;
   
   // Basic setters
   setChats: (chats: Chat[]) => void;
@@ -16,6 +17,7 @@ interface ChatState {
   setMessages: (messages: Message[]) => void;
   setLoading: (loading: boolean) => void;
   addMessage: (message: Message) => void;
+  updateUnreadCount: () => void;
   
   // Chat actions
   getOrCreateChat: (participants: string[]) => Promise<Chat>;
@@ -33,9 +35,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   subscription: null,
   currentSubscriptionChatId: undefined,
+  unreadChatsCount: 0,
   
   // Basic setters
-  setChats: (chats) => set({ chats }),
+  setChats: (chats) => {
+    set({ chats });
+    get().updateUnreadCount();
+  },
   setCurrentChat: (chat) => set({ currentChat: chat }),
   setMessages: (messages) => set({ messages }),
   setLoading: (loading) => set({ isLoading: loading }),
@@ -43,6 +49,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addMessage: (message) => {
     const { messages } = get();
     set({ messages: [...messages, message] });
+    get().updateUnreadCount();
+  },
+  
+  updateUnreadCount: () => {
+    const { chats } = get();
+    const unreadCount = chats.reduce((count, chat) => {
+      return count + (chat.unread_count || 0);
+    }, 0);
+    set({ unreadChatsCount: unreadCount });
   },
   
   // Chat actions

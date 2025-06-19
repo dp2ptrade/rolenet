@@ -60,7 +60,7 @@ export interface Chat {
   participants: string[];
   last_message?: string;
   last_message_time?: Date;
-  unread_count: { [userId: string]: number };
+  unread_count?: number;
   created_at: Date;
   updated_at: Date;
 }

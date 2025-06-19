@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl, Alert, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, Alert, TextInput, ActivityIndicator, TouchableOpacity, Image, Linking, Animated } from 'react-native';
 import { 
   Searchbar, 
   Card, 
@@ -19,6 +19,7 @@ import { MapPin, Star, Phone, Filter, Sparkles, TrendingUp, Tag } from 'lucide-r
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '@/stores/useUserStore';
 import { usePingStore } from '@/stores/usePingStore';
+import { ASSETS } from '@/constants/assets';
 import { User } from '@/lib/types';
 import { userService } from '@/lib/supabaseService';
 import { SmartSearchEngine, SearchFilters, SearchResult } from '@/lib/searchEngine';
@@ -152,6 +153,12 @@ export default function DiscoverScreen() {
   const currentUser = useUserStore((state) => state.user);
   const { sendPing } = usePingStore();
 
+  // Animation for the rotating logo
+  const rotateValue = useRef(new Animated.Value(0)).current;
+  const scaleValue = useRef(new Animated.Value(1)).current;
+  const [isPressed, setIsPressed] = useState(false);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
     location: 'nearby',
@@ -171,8 +178,85 @@ export default function DiscoverScreen() {
       voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
 
+    let animationTimeout: NodeJS.Timeout;
+    
+    // Start the rotation animation
+    const startRotation = () => {
+      rotateValue.setValue(0);
+      const animation = Animated.timing(rotateValue, {
+        toValue: 1,
+        duration: 3000, // 3 seconds for one full rotation
+        useNativeDriver: true,
+      });
+      animationRef.current = animation;
+      animation.start(() => {
+        if (!isPressed) {
+          // Wait 5 seconds before starting the next rotation
+          setTimeout(() => {
+            startRotation(); // Loop the animation only if not pressed
+          }, 5000);
+        }
+      });
+    };
+    startRotation();
+    
+    // Stop animation after 40 seconds
+    animationTimeout = setTimeout(() => {
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+    }, 40000);
+
     loadUsers();
+    
+    return () => {
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+      if (animationTimeout) {
+        clearTimeout(animationTimeout);
+      }
+    };
   }, []);
+
+  // Handle press interactions for the logo
+  const handlePressIn = () => {
+    setIsPressed(true);
+    // Stop the rotation animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    // Scale up the logo
+    Animated.spring(scaleValue, {
+      toValue: 1.2,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    setIsPressed(false);
+    // Scale back to normal
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start(() => {
+      // Restart rotation animation
+      const startRotation = () => {
+        const animation = Animated.timing(rotateValue, {
+          toValue: 1,
+          duration: 4000,
+          useNativeDriver: true,
+        });
+        animationRef.current = animation;
+        animation.start(() => {
+          if (!isPressed) {
+            startRotation();
+          }
+        });
+      };
+      startRotation();
+    });
+  };
 
   const loadUsers = async (appliedFilters: SearchFilters | null = null) => {
     try {
@@ -463,12 +547,48 @@ export default function DiscoverScreen() {
         colors={['#3B82F6', '#06B6D4']}
         style={styles.header}
       >
-        <Text variant="headlineMedium" style={[styles.headerTitle, { textAlign: 'center' }]}>
-          ROLE NET
-        </Text>
-        {/* <Text variant="bodyMedium" style={styles.headerSubtitle}> 
+        <View style={styles.headerTitleContainer}>
+          <View style={styles.headerLeftSection}>
+            <Image 
+              source={ASSETS.IMAGES.LOGO} 
+              style={styles.headerLogo} 
+              resizeMode="contain" 
+            />
+            <Text variant="headlineMedium" style={styles.headerTitle}>
+              ROLE NET
+            </Text>
+          </View>
+          <TouchableOpacity 
+            onPress={() => Linking.openURL('https://bolt.new/')}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            activeOpacity={0.8}
+          >
+            <Animated.Image 
+              source={ASSETS.IMAGES.BLACK_CIRCLE} 
+              style={[
+                styles.boltLogo,
+                {
+                  transform: [
+                    {
+                      rotate: rotateValue.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      })
+                    },
+                    {
+                      scale: scaleValue
+                    }
+                  ]
+                }
+              ]} 
+              resizeMode="contain" 
+            />
+          </TouchableOpacity>
+        </View>
+        {/* <Text variant="bodyMedium" style={styles.headerSubtitle}>
           Discover every profession of people by rule
-         </Text>  */}
+        </Text> */}
       </LinearGradient>
 
       <View style={styles.content}>
@@ -500,23 +620,23 @@ export default function DiscoverScreen() {
 
           {/* Quick Filters */}
           <View style={styles.quickFilters}>
-            {/* <Chip
+             <Chip
               selected={filters.location === 'nearby'}
               onPress={() => setFilters(prev => ({ ...prev, location: 'nearby' }))}
               icon="map-marker"
               style={styles.quickFilterChip}
             >
               Nearby
-            </Chip> */}
-            {/* <Chip
+            </Chip>
+             <Chip
               selected={filters.location === 'global'}
               onPress={() => setFilters(prev => ({ ...prev, location: 'global' }))}
               icon="earth"
               style={styles.quickFilterChip}
             >
               Global
-            </Chip> */}
-            {/* <Chip
+            </Chip>
+             <Chip
               selected={filters.availability === 'available'}
               onPress={() => setFilters(prev => ({ 
                 ...prev, 
@@ -526,7 +646,7 @@ export default function DiscoverScreen() {
               style={styles.quickFilterChip}
             >
               Available
-            </Chip> */}
+            </Chip>
           </View>
 
           {/* Search Suggestions with Tabs */}
@@ -657,7 +777,7 @@ export default function DiscoverScreen() {
                       <View style={styles.userInfo}>
                         <Avatar.Image 
                           size={60} 
-                          source={{ uri: user.avatar }} 
+                          source={{ uri: user.avatar || undefined }} 
                         />
                         <View style={styles.statusIndicator}>
                           <View style={[
@@ -842,10 +962,31 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 16,
   },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  headerLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerLogo: {
+    width: 35,
+    height: 35,
+    marginRight: 10,
+    tintColor: 'white', // Make the logo white to match the header text
+  },
   headerTitle: {
     color: 'white',
     fontWeight: 'bold',
     marginBottom: 4,
+  },
+  boltLogo: {
+    width: 45,
+    height: 45,
+    marginLeft: 10,
   },
   headerSubtitle: {
     color: 'rgba(255, 255, 255, 0.8)',
@@ -867,7 +1008,7 @@ const styles = StyleSheet.create({
   searchActions: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 1, // was at 12
   },
   searchOptions: {
     flexDirection: 'row',
@@ -891,7 +1032,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
+    marginBottom: 2,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -927,7 +1068,7 @@ const styles = StyleSheet.create({
   quickFilters: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   quickFilterChip: {
     backgroundColor: 'white',
@@ -935,8 +1076,8 @@ const styles = StyleSheet.create({
   statsContainer: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    padding: 10,
+    marginBottom: 12, // was at 16
   },
   statsText: {
     color: '#374151',

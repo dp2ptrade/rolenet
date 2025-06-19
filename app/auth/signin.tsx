@@ -19,7 +19,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
-  const { setIsAuthenticated } = useUserStore();
+  const { setIsAuthenticated, loadUserProfile } = useUserStore();
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -38,6 +38,9 @@ export default function SignInScreen() {
 
       if (data.user) {
         setIsAuthenticated(true);
+        
+        // Load user profile into store
+        await loadUserProfile(data.user.id);
         
         // Check if user has completed profile setup
         const { data: userProfile } = await UserService.getUserProfile(data.user.id);

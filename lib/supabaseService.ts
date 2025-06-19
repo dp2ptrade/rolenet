@@ -12,6 +12,27 @@ export class AuthService {
     return { data, error };
   }
 
+  static async confirmSignUp(token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'signup',
+    });
+    return { data, error };
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'recovery',
+    });
+    if (error) return { data: null, error };
+
+    const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    return { data: updateData, error: updateError };
+  }
+
   static async signIn(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,

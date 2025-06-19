@@ -10,6 +10,7 @@ import { usePingStore } from '@/stores/usePingStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { UserService } from '@/lib/supabaseService';
 import { Ping, User } from '@/lib/types';
+import { ASSETS } from '@/constants/assets';
 
 // PingItem Component
 interface PingItemProps {
@@ -49,7 +50,7 @@ const PingItem: React.FC<PingItemProps> = ({ ping, isReceived, getUserInfo, getT
             <View style={styles.userInfo}>
               <Avatar.Image 
                 size={50} 
-                source={require('@/assets/images/icon.png')}
+                source={ASSETS.IMAGES.LOGO}
               />
               <View style={styles.userDetails}>
                 <Text variant="titleMedium" style={styles.userName}>
@@ -79,7 +80,7 @@ const PingItem: React.FC<PingItemProps> = ({ ping, isReceived, getUserInfo, getT
           <View style={styles.userInfo}>
             <Avatar.Image 
               size={50} 
-              source={user.avatar ? { uri: user.avatar } : require('@/assets/images/icon.png')}
+              source={user.avatar ? { uri: user.avatar } : ASSETS.IMAGES.LOGO}
             />
             <View style={styles.userDetails}>
               <Text variant="titleMedium" style={styles.userName}>

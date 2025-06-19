@@ -4,6 +4,9 @@ import { Text, Avatar, IconButton, Surface } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useCallStore } from '@/stores/useCallStore';
+import { useUserStore } from '@/stores/useUserStore';
+import { CallService } from '@/lib/supabaseService';
+import { ASSETS } from '@/constants/assets';
 import { router } from 'expo-router';
 
 interface IncomingCallModalProps {
@@ -68,7 +71,7 @@ export default function IncomingCallModal({
             <View style={styles.callerInfo}>
               <Avatar.Image
                 size={100}
-                source={callerAvatar ? { uri: callerAvatar } : require('@/assets/images/icon.png')}
+                source={callerAvatar ? { uri: callerAvatar } : ASSETS.IMAGES.LOGO}
                 style={styles.avatar}
               />
               <Text variant="headlineSmall" style={styles.callerName}>

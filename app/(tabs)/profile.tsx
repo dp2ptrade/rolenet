@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
 import { Card, Text, Avatar, Button, Switch, List, Divider, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreditCard as Edit3, Settings, Star, MapPin, Phone, Mail, Tag, LogOut } from 'lucide-react-native';
@@ -43,24 +43,31 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Sign Out', 
-          style: 'destructive', 
-          onPress: async () => {
-            // Sign out using the store method
-            await signOut();
-            
-            // Navigate back to sign in
-            router.replace('/auth/signin');
-          }
-        },
-      ]
-    );
+    if (Platform.OS === 'web') {
+      // For web, directly sign out without alert
+      signOut().then(() => {
+        router.replace('/auth/signin');
+      });
+    } else {
+      Alert.alert(
+        'Sign Out',
+        'Are you sure you want to sign out?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Sign Out', 
+            style: 'destructive', 
+            onPress: async () => {
+              // Sign out using the store method
+              await signOut();
+              
+              // Navigate back to sign in
+              router.replace('/auth/signin');
+            }
+          },
+        ]
+      );
+    }
   };
 
   const handleAvailabilityToggle = (value: boolean) => {
@@ -94,7 +101,7 @@ export default function ProfileScreen() {
             <View style={styles.avatarContainer}>
               <Avatar.Image 
                 size={80} 
-                source={{ uri: user.avatar }} 
+                source={{ uri: user.avatar || undefined }} 
               />
               <View style={[
                 styles.statusDot,

@@ -1,7 +1,9 @@
 import { Tabs } from 'expo-router';
-import { Search, Activity, Users, User, Bell } from 'lucide-react-native';
+import { Search, Activity, Users, User, Bell, MessageCircle } from 'lucide-react-native';
 import { useTheme, Badge } from 'react-native-paper';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { useChatStore } from '@/stores/useChatStore';
+import { getPlatformStyles, isWeb } from '@/utils/platform';
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -18,6 +20,16 @@ export default function TabLayout() {
           paddingBottom: 8,
           paddingTop: 8,
           height: 60,
+          ...getPlatformStyles({
+            web: {
+              marginHorizontal: 20,
+              marginBottom: 10,
+              borderRadius: 10,
+              maxWidth: 800,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }
+          }),
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -41,6 +53,37 @@ export default function TabLayout() {
           tabBarIcon: ({ size, color }) => (
             <Activity size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="chats"
+        options={{
+          title: 'Chats',
+          tabBarIcon: ({ size, color }) => {
+            const { unreadChatsCount } = useChatStore();
+            return (
+              <>
+                <MessageCircle size={size} color={color} strokeWidth={2.5} />
+                {unreadChatsCount > 0 && (
+                  <Badge
+                    style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -10,
+                      backgroundColor: theme.colors.error,
+                      color: 'white',
+                      fontSize: 10,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                    }}
+                  >
+                    {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+                  </Badge>
+                )}
+              </>
+            );
+          },
         }}
       />
       <Tabs.Screen

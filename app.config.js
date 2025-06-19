@@ -12,7 +12,8 @@ export default {
     newArchEnabled: false,
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.zxoom.rolenet-app"
+      bundleIdentifier: "com.zxoom.rolenet-app",
+      associatedDomains: ["applinks:rolenet.site"]
     },
     android: {
       adaptiveIcon: {
@@ -29,7 +30,21 @@ export default {
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      package: "com.zxoom.rolenetapp"
+      package: "com.zxoom.rolenetapp",
+      intentFilters: [
+        {
+          action: "VIEW",
+          autoVerify: true,
+          data: [
+            {
+              scheme: "https",
+              host: "rolenet.site",
+              pathPrefix: "/auth/confirm"
+            }
+          ],
+          category: ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     web: {
       bundler: "metro",

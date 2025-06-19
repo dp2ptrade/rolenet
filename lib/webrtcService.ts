@@ -53,6 +53,7 @@ class WebRTCService {
   private callbacks: WebRTCCallbacks = {};
   private isInitiator = false;
   private userId: string | null = null;
+  private isSubscribed: boolean = false;
 
   // STUN/TURN servers configuration
   private readonly pcConfig = {
@@ -77,6 +78,10 @@ class WebRTCService {
   }
 
   setUserId(userId: string) {
+    if (this.userId === userId) {
+      console.log('User ID already set, skipping subscription setup');
+      return;
+    }
     this.userId = userId;
     // Setup subscription after userId is set
     this.setupRealtimeSubscription();
@@ -88,10 +93,17 @@ class WebRTCService {
       return;
     }
 
+    // Check if already subscribed
+    if (this.isSubscribed) {
+      console.log('Realtime subscription already active, skipping setup');
+      return;
+    }
+
     // Cleanup existing channel if any
     if (this.channel) {
       this.channel.unsubscribe();
       this.channel = null;
+      this.isSubscribed = false;
     }
 
     try {
@@ -125,14 +137,17 @@ class WebRTCService {
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('WebRTC realtime subscription established');
+            this.isSubscribed = true;
           } else if (status === 'CHANNEL_ERROR') {
             console.error('WebRTC realtime subscription error');
             this.callbacks.onError?.(new Error('Realtime subscription failed'));
+            this.isSubscribed = false;
           }
         });
     } catch (error) {
       console.error('Error setting up realtime subscription:', error);
       this.callbacks.onError?.(error as Error);
+      this.isSubscribed = false;
     }
   }
 
@@ -321,43 +336,62 @@ class WebRTCService {
       }
       
       try {
+        console.log('Setting up peer connection for call acceptance');
         // Setup peer connection
         await this.setupPeerConnection();
+        console.log('Peer connection setup complete');
         
         // Get local media stream
         await this.getLocalStream();
+        console.log('Local stream obtained for call acceptance');
         
         // Set remote description from offer
-        await this.peerConnection!.setRemoteDescription(callData.offer);
+        if (this.peerConnection) {
+          console.log('Setting remote description');
+          await this.peerConnection.setRemoteDescription(callData.offer);
+          console.log('Remote description set');
+        } else {
+          throw new Error('Peer connection not initialized before setting remote description');
+        }
         
         // Create and send answer
-        const answer = await this.peerConnection!.createAnswer();
-        await this.peerConnection!.setLocalDescription(answer);
-        
-        // Update call with answer
-        const { error: updateError } = await supabase
-          .from('calls')
-          .update({ 
+        if (this.peerConnection) {
+          console.log('Creating answer');
+          const answer = await this.peerConnection.createAnswer();
+          console.log('Answer created, setting local description');
+          await this.peerConnection.setLocalDescription(answer);
+          console.log('Local description set');
+          
+          // Update call with answer
+          const { error: updateError } = await supabase
+            .from('calls')
+            .update({ 
+              answer: answer,
+              status: 'active'
+            })
+            .eq('id', callId);
+
+          if (updateError) {
+            console.error('Database error updating call with answer:', updateError);
+            throw new Error(`Failed to update call with answer: ${updateError.message}`);
+          }
+
+          // Send answer via realtime
+          console.log('Sending answer via signaling');
+          await this.sendSignalingMessage({
+            type: 'answer',
             answer: answer,
-            status: 'active'
-          })
-          .eq('id', callId);
+            callId: callId,
+            targetUserId: callData.caller_id,
+          });
+          console.log('Answer sent successfully');
 
-        if (updateError) {
-          console.error('Database error updating call with answer:', updateError);
-          throw new Error(`Failed to update call with answer: ${updateError.message}`);
+          this.callbacks.onCallAccepted?.(callId);
+        } else {
+          throw new Error('Peer connection not initialized before creating answer');
         }
-
-        // Send answer via realtime
-        await this.sendSignalingMessage({
-          type: 'answer',
-          answer: answer,
-          callId: callId,
-          targetUserId: callData.caller_id,
-        });
-
-        this.callbacks.onCallAccepted?.(callId);
       } catch (setupError) {
+        console.error('Error during call acceptance setup:', setupError);
         // Cleanup call record if setup fails
         await supabase
           .from('calls')
@@ -543,14 +577,17 @@ class WebRTCService {
       }
 
       // Add local stream tracks (modern API)
-       if (this.localStream) {
-         this.localStream.getTracks().forEach(track => {
-           if (this.peerConnection && this.localStream) {
-             this.peerConnection.addTrack(track, this.localStream);
-             console.log(`Added ${track.kind} track to peer connection`);
-           }
-         });
-       }
+      if (this.localStream) {
+        const tracks = this.localStream.getTracks();
+        if (tracks) {
+          tracks.forEach(track => {
+            if (this.peerConnection && this.localStream) {
+              this.peerConnection.addTrack(track, this.localStream);
+              console.log(`Added ${track.kind} track to peer connection`);
+            }
+          });
+        }
+      }
 
        console.log('Peer connection setup completed');
      } catch (error) {
@@ -590,11 +627,14 @@ class WebRTCService {
       }
       
       // Add tracks to peer connection (modern API)
-       if (this.peerConnection && this.localStream) {
-         this.localStream.getTracks().forEach(track => {
-           this.peerConnection!.addTrack(track, this.localStream!);
-         });
-       }
+      if (this.peerConnection && this.localStream) {
+        const tracks = this.localStream.getTracks();
+        if (tracks) {
+          tracks.forEach(track => {
+            this.peerConnection!.addTrack(track, this.localStream!);
+          });
+        }
+      }
     } catch (error) {
       console.error('Error getting local stream:', error);
       
@@ -615,11 +655,14 @@ class WebRTCService {
         }
         
         // Add tracks to peer connection (modern API)
-         if (this.peerConnection && this.localStream) {
-           this.localStream.getTracks().forEach(track => {
-             this.peerConnection!.addTrack(track, this.localStream!);
-           });
-         }
+      if (this.peerConnection && this.localStream) {
+        const tracks = this.localStream.getTracks();
+        if (tracks) {
+          tracks.forEach(track => {
+            this.peerConnection!.addTrack(track, this.localStream!);
+          });
+        }
+      }
       } catch (fallbackError) {
         console.error('Fallback also failed:', fallbackError);
         this.callbacks.onError?.(fallbackError as Error);
@@ -734,10 +777,13 @@ class WebRTCService {
 
     // Stop local media tracks
     if (this.localStream) {
-      this.localStream.getTracks().forEach(track => {
-        track.stop();
-        console.log(`Stopped ${track.kind} track`);
-      });
+      const tracks = this.localStream.getTracks();
+      if (tracks) {
+        tracks.forEach(track => {
+          track.stop();
+          console.log(`Stopped ${track.kind} track`);
+        });
+      }
       this.localStream = null;
     }
 
@@ -756,6 +802,7 @@ class WebRTCService {
     if (this.channel) {
       this.channel.unsubscribe();
       this.channel = null;
+      this.isSubscribed = false;
     }
   }
 }

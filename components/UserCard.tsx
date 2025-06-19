@@ -41,7 +41,7 @@ export default function UserCard({ user, onPing, onViewProfile, onSendFriendRequ
           <View style={styles.userInfo}>
             <Avatar.Image 
               size={60} 
-              source={{ uri: user.avatar }} 
+              source={{ uri: user.avatar || undefined }} 
             />
             <View style={styles.statusIndicator}>
               <View style={[
