@@ -16,7 +16,7 @@ RoleNet is a real-time, professional matchmaking app that allows users from any 
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js (v18 or higher) try v18 for smooth installion. 
 - Expo CLI
 - Supabase account and project
 
