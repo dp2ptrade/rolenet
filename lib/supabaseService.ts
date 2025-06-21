@@ -1,6 +1,9 @@
-import { supabase } from './supabase';
+
 import { User, Ping, Friend, Call, Chat, Message, Rating } from './types';
+import { supabase } from './supabase';
 import { Session, AuthError } from '@supabase/supabase-js';
+import * as FileSystem from 'expo-file-system';
+import 'react-native-url-polyfill/auto';
 
 // Auth Service
 export class AuthService {
@@ -395,7 +398,149 @@ export class ChatService {
     return { data, error };
   }
 
-  static async sendMessage(chatId: string, senderId: string, text: string, mediaUrl?: string, type: string = 'text') {
+  static async uploadMedia(uri: string, bucket: string = 'chat-media'): Promise<string> {
+    console.log('🔄 Starting media upload process...');
+    console.log('📁 URI:', uri);
+    console.log('🪣 Bucket:', bucket);
+    
+    try {
+      // Get current user
+      console.log('🔐 Checking user authentication...');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Authentication failed:', authError);
+        throw new Error('User not authenticated');
+      }
+      console.log('✅ User authenticated:', user.id);
+
+      // Generate unique filename with user ID for RLS
+      let fileExt = 'jpg'; // default extension
+      
+      // Extract file extension based on URI type
+      if (uri.startsWith('data:')) {
+        // For data URLs, extract MIME type
+        const mimeMatch = uri.match(/data:([^;]+)/);
+        if (mimeMatch) {
+          const mimeType = mimeMatch[1];
+          if (mimeType.includes('png')) fileExt = 'png';
+          else if (mimeType.includes('jpeg') || mimeType.includes('jpg')) fileExt = 'jpg';
+          else if (mimeType.includes('gif')) fileExt = 'gif';
+          else if (mimeType.includes('webp')) fileExt = 'webp';
+        }
+      } else {
+        // For regular file URIs, extract extension from path
+        const pathParts = uri.split('.');
+        if (pathParts.length > 1) {
+          fileExt = pathParts.pop() || 'jpg';
+        }
+      }
+      
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      console.log('📝 Generated filename:', fileName);
+
+      // Convert URI to blob
+      console.log('🔄 Converting URI to blob...');
+      let blob: Blob;
+      
+      // Check if it's a local file URI (starts with file://) or a web URI
+      if (uri.startsWith('file://') || uri.startsWith('content://') || uri.startsWith('ph://')) {
+        console.log('📱 Processing local file URI...');
+        // Read local file using FileSystem
+        const base64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        
+        // Determine MIME type from file extension
+        let mimeType = 'application/octet-stream';
+        if (fileExt === 'jpg' || fileExt === 'jpeg') mimeType = 'image/jpeg';
+        else if (fileExt === 'png') mimeType = 'image/png';
+        else if (fileExt === 'gif') mimeType = 'image/gif';
+        else if (fileExt === 'webp') mimeType = 'image/webp';
+        else if (fileExt === 'pdf') mimeType = 'application/pdf';
+        
+        blob = new Blob([byteArray], { type: mimeType });
+      } else {
+        console.log('🌐 Processing web URI...');
+        // Handle web URIs with fetch
+        const response = await fetch.call(globalThis, uri);
+        
+        if (!response.ok) {
+          console.error('❌ Failed to fetch file:', response.status, response.statusText);
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        
+        blob = await response.blob();
+      }
+      console.log('✅ Blob created:', {
+        size: blob.size,
+        type: blob.type
+      });
+
+      // Check file size (limit to 10MB)
+      if (blob.size > 10 * 1024 * 1024) {
+        console.error('❌ File too large:', blob.size);
+        throw new Error('File size exceeds 10MB limit');
+      }
+
+      // Upload to Supabase Storage
+      console.log('☁️ Uploading to Supabase Storage...');
+      const uploadStartTime = Date.now();
+      
+      const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(fileName, blob, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      const uploadDuration = Date.now() - uploadStartTime;
+      console.log(`⏱️ Upload took ${uploadDuration}ms`);
+
+      if (error) {
+        console.error('❌ Supabase upload error:', {
+          message: error.message,
+          error: error
+        });
+        throw error;
+      }
+
+      console.log('✅ Upload successful:', data);
+
+      // Get public URL
+      console.log('🔗 Getting public URL...');
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(fileName);
+
+      console.log('✅ Public URL generated:', publicUrl);
+      return publicUrl;
+      
+    } catch (error) {
+      console.error('💥 Media upload failed:', {
+        error: error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        uri,
+        bucket
+      });
+      
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`Media upload failed: ${error.message}`);
+      }
+      throw new Error('Media upload failed: Unknown error');
+    }
+  }
+
+  static async sendMessage(chatId: string, senderId: string, text: string, mediaUrl?: string, mediaType?: string, type: string = 'text') {
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -403,6 +548,7 @@ export class ChatService {
         sender_id: senderId,
         text,
         media_url: mediaUrl,
+        media_type: mediaType,
         type,
         status: 'sent',
       })
@@ -414,7 +560,7 @@ export class ChatService {
       await supabase
         .from('chats')
         .update({
-          last_message: text || 'Media message',
+          last_message: text || (mediaType === 'image' ? '📷 Image' : '📎 File'),
           last_message_time: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -438,14 +584,84 @@ export class ChatService {
     return { data, error };
   }
 
-  static async getUserChats(userId: string) {
+  static async getUserChats(userId: string, limit: number = 20) {
     const { data, error } = await supabase
       .from('chats')
       .select('*')
       .contains('participants', [userId])
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .limit(limit);
     
     return { data, error };
+  }
+
+  static async togglePinChat(chatId: string, pin: boolean) {
+    const { data, error } = await supabase
+      .from('chats')
+      .update({ is_pinned: pin })
+      .eq('id', chatId)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async deleteMessage(messageId: string) {
+    console.log('ChatService: Deleting message with ID:', messageId);
+    
+    try {
+      // First, get the message to check if it has media attached
+      const { data: message, error: fetchError } = await supabase
+        .from('messages')
+        .select('media_url, media_type')
+        .eq('id', messageId)
+        .single();
+      
+      if (fetchError) {
+        console.error('ChatService: Error fetching message before deletion:', fetchError);
+        return { data: null, error: fetchError };
+      }
+      
+      // Delete the message from the database
+      const { data, error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .select();
+      
+      if (error) {
+        console.error('ChatService: Error deleting message:', error);
+        return { data, error };
+      }
+      
+      // If the message had media attached, delete it from storage
+      if (message && message.media_url && message.media_type) {
+        // Extract the file path from the media URL
+        // The URL format is like: https://[supabase-project].supabase.co/storage/v1/object/public/chat-media/[user-id]/[filename]
+        const urlParts = message.media_url.split('/chat-media/');
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          console.log('ChatService: Attempting to delete media file:', filePath);
+          
+          const { error: storageError } = await supabase.storage
+            .from('chat-media')
+            .remove([filePath]);
+          
+          if (storageError) {
+            console.error('ChatService: Error deleting media file:', storageError);
+            // We still return success for the message deletion even if media deletion fails
+          } else {
+            console.log('ChatService: Media file deleted successfully');
+          }
+        }
+      }
+      
+      console.log('ChatService: Message deleted successfully:', data);
+      return { data, error: null };
+    } catch (error) {
+      console.error('ChatService: Unexpected error in deleteMessage:', error);
+      return { data: null, error };
+    }
   }
 }
 
@@ -544,6 +760,33 @@ export class RealtimeService {
   }
 
   static subscribeToChat(chatId: string, callback: (payload: any) => void) {
+    console.log('RealtimeService: Subscribing to chat:', chatId);
+    
+    const wrappedCallback = (payload: any) => {
+      console.log('RealtimeService: Received event:', payload.eventType, 'for chat:', chatId);
+      
+      // Enhanced logging for debugging
+      if (payload.eventType === 'DELETE') {
+        console.log('RealtimeService: DELETE event details:', JSON.stringify({
+          old: payload.old,
+          schema: payload.schema,
+          table: payload.table,
+          commit_timestamp: payload.commit_timestamp
+        }, null, 2));
+        console.log('RealtimeService: DELETE event old record ID:', payload.old?.id);
+      } else if (payload.eventType === 'INSERT') {
+        console.log('RealtimeService: INSERT event message ID:', payload.new?.id);
+        console.log('RealtimeService: INSERT event details:', JSON.stringify({
+          new: payload.new,
+          schema: payload.schema,
+          table: payload.table,
+          commit_timestamp: payload.commit_timestamp
+        }, null, 2));
+      }
+      
+      callback(payload);
+    };
+    
     return supabase
       .channel(`chat-${chatId}`)
       .on('postgres_changes', {
@@ -551,7 +794,13 @@ export class RealtimeService {
         schema: 'public',
         table: 'messages',
         filter: `chat_id=eq.${chatId}`,
-      }, callback)
+      }, wrappedCallback)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+        filter: `chat_id=eq.${chatId}`,
+      }, wrappedCallback)
       .subscribe();
   }
 }

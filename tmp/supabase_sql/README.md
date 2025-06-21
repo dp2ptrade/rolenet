@@ -1,8 +1,10 @@
-# Message Reactions Migration
+# Database Migrations
 
 This directory contains SQL migration files to update the Supabase database schema.
 
-## Current Migration: Add Reactions Column
+## Available Migrations
+
+### 1. Add Reactions Column
 
 The file `add_reactions_column.sql` adds a JSONB column called `reactions` to the `messages` table. This column is used to store emoji reactions to messages, with the format:
 
@@ -12,6 +14,10 @@ The file `add_reactions_column.sql` adds a JSONB column called `reactions` to th
   "emoji2": ["user_id3"]
 }
 ```
+
+### 2. Add Pin Feature
+
+The file `add_is_pinned_column.sql` adds a BOOLEAN column called `is_pinned` to both the `messages` and `chats` tables. This column is used to mark messages and chats as pinned for quick reference. It also creates indexes for better performance when querying pinned messages and chats.
 
 ## How to Apply the Migration
 
@@ -37,11 +43,20 @@ Replace `[YOUR-PASSWORD]` and `[YOUR-PROJECT-REF]` with your actual Supabase dat
 
 ## Verification
 
-After applying the migration, you can verify it worked by:
+After applying the migrations, you can verify they worked by:
 
 1. Going to the Supabase Dashboard
 2. Navigating to Table Editor
 3. Selecting the `messages` table
-4. Confirming the `reactions` column exists
+4. Confirming the new columns exist:
+   - `reactions` column (JSONB type)
+   - `is_pinned` column (BOOLEAN type)
+5. Selecting the `chats` table
+6. Confirming the new column exists:
+   - `is_pinned` column (BOOLEAN type)
 
-The error message `Error fetching message reactions: {"code": "42703", "details": null, "hint": null, "message": "column messages.reactions does not exist"}` should no longer appear after this migration is applied.
+### Expected Error Fixes
+
+- The error message `Error fetching message reactions: {"code": "42703", "details": null, "hint": null, "message": "column messages.reactions does not exist"}` should no longer appear after applying the reactions migration.
+- The error message `Could not find the 'is_pinned' column of 'messages' in the schema cache` should no longer appear after applying the pin feature migration.
+- The error message `Could not find the 'isPinned' column of 'chats' in the schema cache` should no longer appear after applying the pin feature migration.

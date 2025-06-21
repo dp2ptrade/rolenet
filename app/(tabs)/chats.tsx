@@ -21,24 +21,59 @@ export default function ChatsScreen() {
 
   useEffect(() => {
     if (user?.id) {
-      loadUserChats(user.id);
+      loadUserChats(user.id, 20);
+      // Load friends data when the chats page is accessed
+      useFriendStore.getState().loadFriends(user.id);
     }
   }, [user?.id]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     if (user?.id) {
-      await loadUserChats(user.id);
+      // Load both chats and friends data in parallel
+      await Promise.all([
+        loadUserChats(user.id, 20),
+        useFriendStore.getState().loadFriends(user.id)
+      ]);
     }
     setRefreshing(false);
   }, [user?.id]);
 
-  const filteredChats = chats.filter(chat => {
-    const chatName = chat.participants.length > 2 
-      ? `Group Chat (${chat.participants.length})`
-      : friends.find(f => f.id === chat.participants.find(p => p !== user?.id))?.name || 'Unknown';
-    return chatName.toLowerCase().includes(searchQuery.toLowerCase());
+  // Group one-on-one chats by the other participant
+  const groupedChats: { [key: string]: Chat[] } = {};
+  const groupChats: Chat[] = [];
+
+  chats.forEach(chat => {
+    if (chat.participants.length > 2) {
+      groupChats.push(chat);
+    } else {
+      const otherUserId = chat.participants.find(p => p !== user?.id);
+      if (otherUserId) {
+        if (!groupedChats[otherUserId]) {
+          groupedChats[otherUserId] = [];
+        }
+        groupedChats[otherUserId].push(chat);
+      }
+    }
   });
+
+  // Separate pinned chats
+  const pinnedUserChats: [string, Chat[]][] = [];
+  const unpinnedUserChats: [string, Chat[]][] = [];
+  Object.entries(groupedChats).forEach(([userId, chats]) => {
+    const friend = friends.find(f => f.id === userId);
+    const chatName = friend?.name || 'Unknown';
+    if (chatName.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (chats.some(chat => chat.isPinned)) {
+        pinnedUserChats.push([userId, chats]);
+      } else {
+        unpinnedUserChats.push([userId, chats]);
+      }
+    }
+  });
+
+  const pinnedGroupChats = groupChats.filter(chat => chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const unpinnedGroupChats = groupChats.filter(chat => !chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -71,7 +106,7 @@ export default function ChatsScreen() {
         >
           {isLoading ? (
             <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading chats...</Text>
-          ) : filteredChats.length === 0 ? (
+          ) : (pinnedUserChats.length === 0 && pinnedGroupChats.length === 0 && unpinnedUserChats.length === 0 && unpinnedGroupChats.length === 0) ? (
             <Card style={styles.emptyCard}>
               <Card.Content style={styles.emptyContent}>
                 <MessageSquare size={48} color="#6B7280" />
@@ -84,9 +119,30 @@ export default function ChatsScreen() {
               </Card.Content>
             </Card>
           ) : (
-            filteredChats.map((chat, index) => (
-              <ChatItem key={`${chat.id}-${index}`} chat={chat} />
-            ))
+            <>
+              {(pinnedUserChats.length > 0 || pinnedGroupChats.length > 0) && (
+                <>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>Pinned Chats</Text>
+                  {pinnedUserChats.map(([userId, userChats], index) => (
+                    <ChatItem key={`pinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
+                  ))}
+                  {pinnedGroupChats.map((chat, index) => (
+                    <ChatItem key={`pinned-group-${chat.id}`} chat={chat} />
+                  ))}
+                </>
+              )}
+              {(unpinnedUserChats.length > 0 || unpinnedGroupChats.length > 0) && (
+                <>
+                  <Text variant="titleMedium" style={styles.sectionTitle}>Recent Chats</Text>
+                  {unpinnedUserChats.map(([userId, userChats], index) => (
+                    <ChatItem key={`unpinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
+                  ))}
+                  {unpinnedGroupChats.map((chat, index) => (
+                    <ChatItem key={`unpinned-group-${chat.id}`} chat={chat} />
+                  ))}
+                </>
+              )}
+            </>
           )}
         </ScrollView>
       </View>
@@ -114,26 +170,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    padding: 24,
-    paddingTop: 16,
+    padding: 12,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   headerTitle: {
     color: 'white',
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: 'rgba(255, 255, 255, 0.8)',
+    marginLeft: 12,
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
   searchbar: {
-    backgroundColor: 'white',
-    marginTop: -20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 10,
     marginBottom: 16,
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
   },
   scrollContent: {
     paddingBottom: 100,
@@ -141,6 +216,14 @@ const styles = StyleSheet.create({
   emptyCard: {
     backgroundColor: 'white',
     marginTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   emptyContent: {
     alignItems: 'center',
@@ -160,6 +243,18 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#38BDF8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  sectionTitle: {
+    marginTop: 16,
+    marginBottom: 8,
+    paddingLeft: 16,
+    color: '#6B7280',
+    fontWeight: 'bold',
   },
 });

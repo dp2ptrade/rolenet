@@ -63,6 +63,7 @@ export interface Chat {
   unread_count?: number;
   created_at: Date;
   updated_at: Date;
+  isPinned?: boolean;
 }
 
 export interface Message {
@@ -73,6 +74,7 @@ export interface Message {
   type: 'text' | 'image' | 'audio';
   status: 'sent' | 'delivered' | 'read';
   timestamp: Date;
+  isPinned?: boolean;
 }
 
 export interface Rating {

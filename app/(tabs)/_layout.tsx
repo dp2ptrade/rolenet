@@ -24,6 +24,7 @@ export default function TabLayout() {
             web: {
               marginHorizontal: 20,
               marginBottom: 10,
+              paddingBottom: 1,
               borderRadius: 10,
               maxWidth: 800,
               marginLeft: 'auto',

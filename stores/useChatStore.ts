@@ -18,10 +18,11 @@ interface ChatState {
   setLoading: (loading: boolean) => void;
   addMessage: (message: Message) => void;
   updateUnreadCount: () => void;
+  togglePinChat: (chatId: string, pin: boolean) => Promise<void>;
   
   // Chat actions
   getOrCreateChat: (participants: string[]) => Promise<Chat>;
-  loadUserChats: (userId: string) => Promise<void>;
+  loadUserChats: (userId: string, limit?: number) => Promise<void>;
   sendMessage: (chatId: string, senderId: string, text: string, type?: string) => Promise<void>;
   loadChatMessages: (chatId: string, limit?: number) => Promise<void>;
   subscribeToMessages: (chatId: string) => void;
@@ -60,6 +61,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ unreadChatsCount: unreadCount });
   },
   
+  togglePinChat: async (chatId, pin) => {
+    try {
+      const { data, error } = await chatService.togglePinChat(chatId, pin);
+      if (error) throw error;
+      
+      const { chats } = get();
+      const updatedChats = chats.map(chat => 
+        chat.id === chatId ? { ...chat, isPinned: pin } : chat
+      );
+      set({ chats: updatedChats });
+    } catch (error) {
+      console.error('Toggle pin chat error:', error);
+      throw error;
+    }
+  },
+  
   // Chat actions
   getOrCreateChat: async (participants) => {
     try {
@@ -69,16 +86,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (error) throw error;
       if (!chat) throw new Error('No chat data returned');
       
+      // Map database column names to TypeScript interface
+      const mappedChat = {
+        ...chat,
+        isPinned: chat.is_pinned || false
+      };
+      
       // Update chats list if this is a new chat
       const { chats } = get();
-      const existingChatIndex = chats.findIndex(c => c.id === chat.id);
+      const existingChatIndex = chats.findIndex(c => c.id === mappedChat.id);
       
       if (existingChatIndex === -1) {
-        set({ chats: [chat, ...chats] });
+        set({ chats: [mappedChat, ...chats] });
       }
       
-      set({ currentChat: chat });
-      return chat;
+      set({ currentChat: mappedChat });
+      return mappedChat;
     } catch (error) {
       console.error('Get or create chat error:', error);
       throw error;
@@ -87,12 +110,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   
-  loadUserChats: async (userId) => {
+  loadUserChats: async (userId, limit = 20) => {
     try {
       set({ isLoading: true });
-      const { data: chats, error } = await chatService.getUserChats(userId);
+      const { data: chats, error } = await chatService.getUserChats(userId, limit);
       if (error) throw error;
-      set({ chats: chats || [] });
+      
+      // Map database column names to TypeScript interface
+      const mappedChats = (chats || []).map(chat => ({
+        ...chat,
+        isPinned: chat.is_pinned || false
+      }));
+      
+      set({ chats: mappedChats });
     } catch (error) {
       console.error('Load user chats error:', error);
       throw error;
@@ -163,11 +193,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     console.log('Subscribing to messages for chat:', chatId);
     
-    // Subscribe to new messages
+    // Subscribe to new messages and deleted messages
     const newSubscription = realtimeService.subscribeToChat(chatId, (payload) => {
-      const newMessage = payload.new;
-      const { addMessage } = get();
-      addMessage(newMessage);
+      console.log('useChatStore: Received payload:', payload.eventType);
+      
+      // Handle INSERT events
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const newMessage = payload.new;
+        console.log('useChatStore: Adding new message:', newMessage.id);
+        const { addMessage } = get();
+        addMessage(newMessage);
+      }
+      
+      // Handle DELETE events
+      if (payload.eventType === 'DELETE' && payload.old) {
+        const deletedMessage = payload.old;
+        console.log('useChatStore: Deleting message:', deletedMessage.id);
+        
+        const { messages, pinnedMessages } = get();
+        console.log('useChatStore: Current message count:', messages.length);
+        console.log('useChatStore: Current pinned message count:', pinnedMessages.length);
+        
+        // Filter out the deleted message from both messages and pinnedMessages
+        const updatedMessages = messages.filter(msg => msg.id !== deletedMessage.id);
+        const updatedPinnedMessages = pinnedMessages.filter(msg => msg.id !== deletedMessage.id);
+        
+        // Update the state
+        set({ 
+          messages: updatedMessages,
+          pinnedMessages: updatedPinnedMessages 
+        });
+        
+        console.log('useChatStore: New message count:', updatedMessages.length);
+        console.log('useChatStore: New pinned message count:', updatedPinnedMessages.length);
+        
+        // Clear any fallback timeout for this message
+        // @ts-ignore - Accessing custom property
+        if (window._deleteMessageTimeouts && window._deleteMessageTimeouts[deletedMessage.id]) {
+          console.log('useChatStore: Clearing fallback timeout for message:', deletedMessage.id);
+          // @ts-ignore
+          clearTimeout(window._deleteMessageTimeouts[deletedMessage.id]);
+          // @ts-ignore
+          delete window._deleteMessageTimeouts[deletedMessage.id];
+        }
+      }
     });
     
     set({ 

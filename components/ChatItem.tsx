@@ -1,13 +1,14 @@
 import React from 'react';
-import { Card, Text, Avatar } from 'react-native-paper';
+import { Card, Text, Avatar, IconButton } from 'react-native-paper';
 import { StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Chat } from '@/lib/types';
 import { useUserStore } from '@/stores/useUserStore';
 import { useFriendStore } from '@/stores/useFriendStore';
-import { Users } from 'lucide-react-native';
+import { useChatStore } from '@/stores/useChatStore';
+import { Users, Pin } from 'lucide-react-native';
 
-export const ChatItem = ({ chat }: { chat: Chat }) => {
+export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }) => {
   const { user } = useUserStore();
   const { friends } = useFriendStore();
 
@@ -15,7 +16,7 @@ export const ChatItem = ({ chat }: { chat: Chat }) => {
     const isGroup = chat.participants.length > 2;
     if (isGroup) {
       router.push({
-        pathname: '/chat',
+        pathname: '/groupChat',
         params: {
           chatId: chat.id,
           chatName: `Group Chat (${chat.participants.length})`,
@@ -51,7 +52,13 @@ export const ChatItem = ({ chat }: { chat: Chat }) => {
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
       const otherUser = friends.find(f => f.id === otherUserId);
-      return <Avatar.Image size={50} source={{ uri: otherUser?.avatar || undefined }} />;
+      
+      // If friend data is not loaded yet, show a placeholder avatar
+      if (!otherUser || !otherUser.avatar) {
+        return <Avatar.Text size={50} label={otherUser?.name?.charAt(0) || '?'} />;
+      }
+      
+      return <Avatar.Image size={50} source={{ uri: otherUser.avatar }} />;
     }
   };
 
@@ -71,7 +78,18 @@ export const ChatItem = ({ chat }: { chat: Chat }) => {
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
       const otherUser = friends.find(f => f.id === otherUserId);
-      return otherUser?.role || '';
+      const chatCount = userChats ? userChats.length : 1;
+      return `${otherUser?.role || ''} • ${chatCount} chat${chatCount > 1 ? 's' : ''}`;
+    }
+  };
+
+  const { togglePinChat } = useChatStore();
+
+  const handlePinToggle = async () => {
+    try {
+      await togglePinChat(chat.id, !(chat.isPinned || false));
+    } catch (error) {
+      console.error('Error toggling pin for chat:', error);
     }
   };
 
@@ -87,6 +105,12 @@ export const ChatItem = ({ chat }: { chat: Chat }) => {
             {getChatSubtitle()}
           </Text>
         </View>
+        <IconButton
+          icon={({ size, color }: { size: number; color: string }) => <Pin size={size} color={chat.isPinned ? '#F59E0B' : color} />}
+          size={20}
+          onPress={handlePinToggle}
+          style={styles.pinButton}
+        />
       </Card.Content>
     </Card>
   );
@@ -112,5 +136,8 @@ const styles = StyleSheet.create({
   },
   chatSubtitle: {
     color: '#6B7280',
+  },
+  pinButton: {
+    margin: 0,
   },
 });

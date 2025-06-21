@@ -213,7 +213,7 @@ export class VoiceSearchService {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.wav');
 
-      const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
+      const response = await fetch.call(globalThis, 'https://api.elevenlabs.io/v1/speech-to-text', {
         method: 'POST',
         headers: {
           'xi-api-key': this.config.elevenLabsApiKey,
@@ -246,7 +246,7 @@ export class VoiceSearchService {
     }
 
     try {
-      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${this.config.voiceId || 'pNInz6obpgDQGcFmaJgB'}`, {
+      const response = await fetch.call(globalThis, `https://api.elevenlabs.io/v1/text-to-speech/${this.config.voiceId || 'pNInz6obpgDQGcFmaJgB'}`, {
         method: 'POST',
         headers: {
           'Accept': 'audio/mpeg',

@@ -89,9 +89,9 @@ export default function UserCard({ user, onPing, onViewProfile, onSendFriendRequ
 
         <View style={styles.tagsContainer}>
           {user.tags.slice(0, 3).map((tag, index) => (
-            <Chip key={index} compact style={styles.tag}>
-              {tag}
-            </Chip>
+<Chip key={index} compact style={styles.tag}>
+ {tag}
+</Chip>
           ))}
         </View>
 

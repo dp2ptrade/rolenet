@@ -422,71 +422,27 @@ useEffect(() => {
     return count;
   };
 
-  const UserListItem = ({ item, onViewProfile, onPing }: { item: SearchResult; onViewProfile: (userId: string) => void; onPing: (userId: string) => void }) => {
+  const renderUserItem = ({ item }: { item: SearchResult }) => {
     const { user, relevanceScore, distance } = item;
-    const pulseAnim = useRef(new Animated.Value(1)).current;
-
-    useEffect(() => {
-      if (user.online_status === 'online') {
-        const pulse = Animated.loop(
-          Animated.sequence([
-            Animated.timing(pulseAnim, {
-              toValue: 1.2,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 1000,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-        pulse.start();
-        return () => pulse.stop();
-      }
-    }, [user.online_status]);
-
     return (
       <TouchableOpacity 
         style={styles.userListItem}
-        onPress={() => onViewProfile(user.id)}
+        onPress={() => handleViewProfile(user.id)}
       >
-        <View style={styles.userInfo}>
-          <LinearGradient
-            colors={['#38BDF8', '#0EA5E9']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.avatarGradient}
-          >
-            <Avatar.Image 
-              size={50} 
-              source={{ uri: user.avatar || undefined }} 
-              style={{ backgroundColor: 'white' }}
-            />
-          </LinearGradient>
-        </View>
+        <LinearGradient
+          colors={['#38BDF8', '#0EA5E9']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarGradient}
+        >
+          <Avatar.Image 
+            size={50} 
+            source={{ uri: user.avatar || undefined }} 
+            style={{ backgroundColor: 'white' }}
+          />
+        </LinearGradient>
         <View style={styles.userListDetails}>
-          <View style={styles.nameRow}>
-            <Text style={styles.userListName}>{user.name}</Text>
-            <View style={styles.statusIndicator}>
-              <Animated.View 
-                style={[
-                  styles.statusDot,
-                  { 
-                    backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444',
-                    transform: [{ scale: user.online_status === 'online' ? pulseAnim : 1 }]
-                  }
-                ]}
-              />
-              <Text style={[
-                styles.statusText,
-                { color: user.online_status === 'online' ? '#10B981' : '#EF4444' }
-              ]}>
-                {user.online_status === 'online' ? 'Online' : 'Offline'}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.userListName}>{user.name}</Text>
           <Text style={styles.userListRole}>{user.role} {getRoleEmoji(user.role)}</Text>
           <View style={styles.userListRating}>
             <Star size={14} color="#F59E0B" fill="#F59E0B" />
@@ -501,23 +457,13 @@ useEffect(() => {
         </View>
         <Button
           mode="contained"
-          onPress={() => onPing(user.id)}
+          onPress={() => handlePingUser(user.id)}
           style={styles.pingListButton}
           compact
         >
           Ping
         </Button>
       </TouchableOpacity>
-    );
-  };
-
-  const renderUserItem = ({ item }: { item: SearchResult }) => {
-    return (
-      <UserListItem 
-        item={item} 
-        onViewProfile={handleViewProfile} 
-        onPing={handlePingUser} 
-      />
     );
   };
 
@@ -1174,41 +1120,6 @@ const styles = StyleSheet.create({
   pingListButton: {
     backgroundColor: '#38BDF8',
     paddingHorizontal: 8,
-  },
-  userInfo: {
-    marginRight: 12,
-    borderWidth: 0,
-    borderColor: 'transparent',
-    borderRadius: 50,
-    overflow: 'hidden',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginLeft: 4,
-    marginTop: 2,
   },
   snackbar: {
     backgroundColor: '#374151',

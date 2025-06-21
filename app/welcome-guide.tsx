@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Image, Animated, Dimensions, Platform, TouchableOpacity, Linking } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Animated, Dimensions, Platform, TouchableOpacity, Linking, Easing } from 'react-native';
 import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
@@ -28,6 +28,7 @@ const WelcomeGuideScreen = () => {
       friction: ANIMATIONS.SPRING.FRICTION,
     });
 
+    // Start initial animations
     Animated.parallel([
       Animated.timing(fadeAnim, fadeConfig),
       Animated.spring(scaleAnim, scaleConfig),
@@ -42,15 +43,27 @@ const WelcomeGuideScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={COLORS.GRADIENT.BLUE}
+        colors={['#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.container}
       >
         <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <View style={styles.header}>
-          <Image
-            source={ASSETS.IMAGES.LOGO}
-            style={styles.logo}
-          />
+          <View style={{
+            shadowColor: '#0ea5e9',
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 20,
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            borderRadius: 40,
+            padding: 10,
+          }}>
+            <Image
+              source={ASSETS.IMAGES.LOGO}
+              style={[styles.logo, { tintColor: '#ffffff' }]}
+            />
+          </View>
           <Title style={styles.title}>Welcome to RoleNet</Title>
 
           <Animated.View style={[
@@ -72,13 +85,15 @@ const WelcomeGuideScreen = () => {
         <View style={styles.content}>
             <Card style={[styles.card, styles.featureCard]} elevation={5}>
               <LinearGradient
-                colors={['#ffffff', '#f3e8ff']}
+                colors={['#ffffff', '#e0f7ff', '#bae6fd']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
-                  <View style={[styles.iconContainer, styles.accentIconContainer]}>
-                    <View style={styles.iconBackground}>
-                      <Users size={32} color={COLORS.WHITE} />
+                  <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, {backgroundColor: COLORS.WHITE}]}>
+                      <Users size={32} color="#0ea5e9" />
                     </View>
                   </View>
                   <Title style={styles.cardTitle}>Target Audience</Title>
@@ -95,13 +110,15 @@ const WelcomeGuideScreen = () => {
 
             <Card style={[styles.card, styles.featureCard]} elevation={5}>
               <LinearGradient
-                colors={['#ffffff', '#f0f9ff']}
+                colors={['#ffffff', '#e0f2fe', '#bae6fd']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
-                  <View style={[styles.iconContainer, styles.secondaryIconContainer]}>
-                    <View style={styles.iconBackground}>
-                      <Search size={32} color={COLORS.WHITE} />
+                  <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, {backgroundColor: COLORS.WHITE}]}>
+                      <Search size={32} color="#3b82f6" />
                     </View>
                   </View>
                   <Title style={styles.cardTitle}>Discover & Connect</Title>
@@ -118,13 +135,15 @@ const WelcomeGuideScreen = () => {
 
             <Card style={[styles.card, styles.featureCard]} elevation={5}>
               <LinearGradient
-                colors={['#ffffff', '#f0fdf4']}
+                colors={['#ffffff', '#dcfce7', '#bbf7d0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
-                  <View style={[styles.iconContainer, styles.successIconContainer]}>
-                    <View style={styles.iconBackground}>
-                      <MessageSquare size={32} color={COLORS.WHITE} />
+                  <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, {backgroundColor: COLORS.WHITE}]}>
+                      <MessageSquare size={32} color="#10b981" />
                     </View>
                   </View>
                   <Title style={styles.cardTitle}>Real-Time Collaboration</Title>
@@ -141,13 +160,15 @@ const WelcomeGuideScreen = () => {
 
             <Card style={[styles.card, styles.featureCard]} elevation={5}>
               <LinearGradient
-                colors={['#ffffff', '#fefce8']}
+                colors={['#ffffff', '#fef9c3', '#fde68a']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
-                  <View style={[styles.iconContainer, styles.warningIconContainer]}>
-                    <View style={styles.iconBackground}>
-                      <Bell size={32} color={COLORS.WHITE} />
+                  <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, {backgroundColor: COLORS.WHITE}]}>
+                      <Bell size={32} color="#f59e0b" />
                     </View>
                   </View>
                   <Title style={styles.cardTitle}>Smart Ping System</Title>
@@ -164,13 +185,15 @@ const WelcomeGuideScreen = () => {
 
             <Card style={[styles.card, styles.featureCard]} elevation={5}>
               <LinearGradient
-                colors={['#ffffff', '#fdf2f8']}
+                colors={['#ffffff', '#fce7f3', '#fbcfe8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
-                  <View style={[styles.iconContainer, styles.accentIconContainer]}>
-                    <View style={styles.iconBackground}>
-                      <Star size={32} color={COLORS.WHITE} />
+                  <View style={styles.iconContainer}>
+                    <View style={[styles.iconBackground, {backgroundColor: COLORS.WHITE}]}>
+                      <Star size={32} color="#8b5cf6" />
                     </View>
                   </View>
                   <Title style={styles.cardTitle}>Trust & Reviews</Title>
@@ -187,7 +210,9 @@ const WelcomeGuideScreen = () => {
 
             <Card style={[styles.card, styles.visionCard]} elevation={5}>
               <LinearGradient
-                colors={[COLORS.PRIMARY, '#1e40af']}
+                colors={['#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.cardGradient}
               >
                 <Card.Content style={styles.cardContent}>
@@ -213,7 +238,7 @@ const WelcomeGuideScreen = () => {
               onPress={handleGetStarted}
               style={styles.getStartedButton}
               buttonColor={COLORS.WHITE}
-              textColor={COLORS.PRIMARY}
+              textColor="#0ea5e9"
             >
               Get Started
             </Button>
@@ -249,6 +274,7 @@ const styles = StyleSheet.create({
     width: DIMENSIONS.LOGO.WIDTH,
     height: DIMENSIONS.LOGO.HEIGHT,
     marginBottom: SPACING.SM,
+    resizeMode: 'contain',
   },
   title: {
     fontSize: TYPOGRAPHY.SIZES.TITLE,
@@ -269,21 +295,22 @@ const styles = StyleSheet.create({
   },
   card: {
     marginBottom: SPACING.LG,
-    borderRadius: 20,
+    borderRadius: 30,
     marginHorizontal: SPACING.SM,
     overflow: 'hidden',
   },
   featureCard: {
-    shadowColor: COLORS.PRIMARY,
+    shadowColor: '#0ea5e9',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
+    elevation: 6,
   },
   visionCard: {
-    shadowColor: COLORS.PRIMARY,
+    shadowColor: '#0ea5e9',
     shadowOffset: {
       width: 0,
       height: 8,
@@ -292,14 +319,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
   },
   cardGradient: {
-    borderRadius: 20,
+    borderRadius: 30,
+    overflow: 'hidden',
   },
   cardContent: {
     paddingVertical: SPACING.LG,
     paddingHorizontal: SPACING.MD,
   },
   cardTitle: {
-    color: COLORS.PRIMARY,
+    color: '#0ea5e9',
     fontSize: 18,
     fontWeight: TYPOGRAPHY.WEIGHTS.BOLD,
     marginBottom: SPACING.SM,
@@ -314,7 +342,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 2,
-    backgroundColor: COLORS.PRIMARY + '20',
+    backgroundColor: 'rgba(14, 165, 233, 0.3)',
     width: 40,
     alignSelf: 'center',
     marginBottom: SPACING.MD,
@@ -327,8 +355,8 @@ const styles = StyleSheet.create({
   cardHighlight: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.PRIMARY,
-    backgroundColor: COLORS.PRIMARY + '15',
+    color: '#0ea5e9',
+    backgroundColor: 'rgba(14, 165, 233, 0.15)',
     paddingHorizontal: SPACING.SM,
     paddingVertical: 4,
     borderRadius: 12,
@@ -389,27 +417,16 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
   },
-  primaryIconContainer: {
-    backgroundColor: COLORS.PRIMARY,
-  },
-  secondaryIconContainer: {
-    backgroundColor: '#3b82f6',
-  },
-  successIconContainer: {
-    backgroundColor: '#10b981',
-  },
-  warningIconContainer: {
-    backgroundColor: '#f59e0b',
-  },
-  accentIconContainer: {
-    backgroundColor: '#ec4899',
-  },
+
   visionIconContainer: {
     alignItems: 'center',
     marginBottom: SPACING.MD,

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { Card, Text, Avatar, Button, Surface, Searchbar, FAB, Portal, Dialog, Paragraph, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Phone, MessageSquare, Star, UserPlus } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { User, Friend } from '@/lib/types';
 import { useUserStore } from '@/stores/useUserStore';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { UserService } from '@/lib/supabaseService';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 
 export default function FriendsScreen() {
   const [selectedTab, setSelectedTab] = useState<'friends' | 'requests'>('friends');
@@ -175,22 +176,14 @@ export default function FriendsScreen() {
       <View style={styles.content}>
         <View style={styles.tabContainer}>
           <Surface style={styles.tabBar} elevation={2}>
-            <Button
-              mode={selectedTab === 'friends' ? 'contained' : 'text'}
-              onPress={() => setSelectedTab('friends')}
-              style={styles.tabButton}
-              compact
-            >
-              Friends ({friends.filter(friend => friend && friend.name && friend.role).length})
-            </Button>
-            <Button
-              mode={selectedTab === 'requests' ? 'contained' : 'text'}
-              onPress={() => setSelectedTab('requests')}
-              style={styles.tabButton}
-              compact
-            >
-              Requests ({friendRequests.length})
-            </Button>
+            <TabSelector 
+              tabs={['friends', 'requests']} 
+              selectedTab={selectedTab} 
+              onSelectTab={setSelectedTab} 
+              labels={['Friends', 'Requests']} 
+              friendsCount={friends.filter(friend => friend && friend.name && friend.role).length}
+              requestsCount={friendRequests.length}
+            />
           </Surface>
         </View>
 
@@ -227,7 +220,7 @@ export default function FriendsScreen() {
               </Card>
             ) : (
               filteredFriends.map((friend, index) => (
-                <Card key={`${friend.id}-${index}`} style={styles.friendCard}>
+                <Card key={`friend-${friend.id}`} style={styles.friendCard}>
                   <Card.Content>
                     <View style={styles.friendHeader}>
                       <View style={styles.userInfo}>
@@ -314,7 +307,7 @@ export default function FriendsScreen() {
               friendRequests.map((request, index) => {
                 const requestUser = requestUsers[request.user_a];
                 return (
-                  <Card key={`${request.id}-${index}`} style={styles.requestCard}>
+                  <Card key={`request-${request.id}`} style={styles.requestCard}>
                     <Card.Content>
                       <View style={styles.requestHeader}>
                         <Avatar.Image 
@@ -407,39 +400,93 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    padding: 24,
-    paddingTop: 16,
+    padding: 12,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   headerTitle: {
     color: 'white',
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: 'rgba(255, 255, 255, 0.8)',
+    marginLeft: 12,
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
   tabContainer: {
-    marginTop: -20,
+    marginTop: 10,
     marginBottom: 16,
+    paddingHorizontal: 8,
+    zIndex: 0,
   },
   tabBar: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 4,
-    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    height: 50,
+    overflow: 'hidden',
   },
-  tabButton: {
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    height: 42, // Constrain the height to prevent excessive growth
+    position: 'relative',
+  },
+  tabItem: {
     flex: 1,
-    marginHorizontal: 2,
+    height: 42,
+  },
+  tabItemContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8, // Reduced padding to fit within constrained height
+    paddingHorizontal: 4,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4B5563',
+    textAlign: 'center',
+  },
+  selectedTabText: {
+    color: '#1E40AF',
+    fontWeight: 'bold',
   },
   searchbar: {
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 16,
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3B82F6',
   },
   scrollContent: {
     paddingBottom: 100,
@@ -447,6 +494,14 @@ const styles = StyleSheet.create({
   emptyCard: {
     backgroundColor: 'white',
     marginTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   emptyContent: {
     alignItems: 'center',
@@ -464,10 +519,20 @@ const styles = StyleSheet.create({
   friendCard: {
     marginBottom: 16,
     backgroundColor: 'white',
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   friendHeader: {
     marginBottom: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    padding: 10,
+    borderRadius: 12,
   },
   userInfo: {
     flexDirection: 'row',
@@ -485,6 +550,11 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     borderWidth: 2,
     borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   userDetails: {
     flex: 1,
@@ -513,15 +583,21 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(59, 130, 246, 0.1)',
   },
   callButton: {
     flex: 1,
+    backgroundColor: '#38BDF8',
   },
   chatButton: {
     flex: 1,
+    backgroundColor: 'rgba(56, 189, 248, 0.3)',
   },
   rateButton: {
     flex: 1,
+    borderColor: '#0EA5E9',
   },
   actionButtonContent: {
     paddingVertical: 4,
@@ -529,11 +605,21 @@ const styles = StyleSheet.create({
   requestCard: {
     marginBottom: 16,
     backgroundColor: 'white',
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   requestHeader: {
     flexDirection: 'row',
     marginBottom: 16,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    padding: 10,
+    borderRadius: 12,
   },
   requestDetails: {
     marginLeft: 12,
@@ -554,12 +640,17 @@ const styles = StyleSheet.create({
   requestActions: {
     flexDirection: 'row',
     gap: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(59, 130, 246, 0.1)',
   },
   acceptButton: {
     flex: 1,
+    backgroundColor: '#38BDF8',
   },
   declineButton: {
     flex: 1,
+    borderColor: '#0EA5E9',
   },
   requestButtonContent: {
     paddingVertical: 4,
@@ -569,6 +660,131 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#38BDF8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
 });
+
+// Custom animated tab selector component for Friends page
+interface TabSelectorProps {
+  tabs: string[];
+  selectedTab: string;
+  onSelectTab: React.Dispatch<React.SetStateAction<'friends' | 'requests'>>;
+  labels: string[];
+  friendsCount: number;
+  requestsCount: number;
+}
+
+function TabSelector({ tabs, selectedTab, onSelectTab, labels, friendsCount, requestsCount }: TabSelectorProps) {
+  // Create animated values for the indicator
+  const indicatorPosition = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+  
+  // References to measure tab widths
+  const tabRefs = useRef<(React.RefObject<View>)[]>(tabs.map(() => React.createRef<View>()));
+  const tabWidths = useRef<number[]>(tabs.map(() => 0));
+  const tabPositions = useRef<number[]>(tabs.map(() => 0));
+  const isLayoutCalculated = useRef<boolean>(false);
+  
+  // Update indicator position when tab changes
+  useEffect(() => {
+    if (isLayoutCalculated.current) {
+      const index = tabs.indexOf(selectedTab);
+      if (index !== -1) {
+        indicatorPosition.value = withTiming(tabPositions.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+        indicatorWidth.value = withTiming(tabWidths.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+      }
+    }
+  }, [selectedTab]);
+
+  // Function to handle layout calculation
+  const handleTabLayout = (index: number) => (event: any) => {
+    const { width, x } = event.nativeEvent.layout;
+    tabWidths.current[index] = width;
+    tabPositions.current[index] = x;
+    // Check if all tabs have been measured
+    if (tabWidths.current.every(w => w > 0)) {
+      isLayoutCalculated.current = true;
+      // Initialize indicator position for the selected tab
+      const selectedIndex = tabs.indexOf(selectedTab);
+      if (selectedIndex !== -1) {
+        indicatorPosition.value = tabPositions.current[selectedIndex];
+        indicatorWidth.value = tabWidths.current[selectedIndex];
+      }
+    }
+  };
+  
+  // Animated style for the indicator
+  const indicatorStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      bottom: 0,
+      left: indicatorPosition.value,
+      width: indicatorWidth.value,
+      height: 3,
+      backgroundColor: '#38BDF8',
+      borderRadius: 1.5,
+    };
+  });
+  
+  return (
+    <View style={styles.tabSelectorContainer}>
+      {tabs.map((tab: string, index: number) => {
+        const isSelected = tab === selectedTab;
+        
+        // Create animated styles for each tab
+        const tabAnimatedStyle = useAnimatedStyle(() => {
+          return {
+            opacity: withTiming(isSelected ? 1 : 0.7, { duration: 200 }),
+            transform: [
+              { 
+                scale: withTiming(isSelected ? 1.05 : 1, { 
+                  duration: 200,
+                  easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+                })
+              }
+            ],
+          };
+        });
+        
+        return (
+          <Pressable
+            key={tab}
+            ref={tabRefs.current[index]}
+            style={styles.tabItem}
+            onLayout={handleTabLayout(index)}
+            onPress={() => {
+              // Add a small bounce effect when pressed
+              if (tab !== selectedTab) {
+                onSelectTab(tab as 'friends' | 'requests');
+              }
+            }}
+          >
+            <Animated.View style={[styles.tabItemContent, tabAnimatedStyle]}>
+              <Text 
+                style={[styles.tabText, isSelected && styles.selectedTabText]}
+              >
+                {labels[index]}
+                {tab === 'friends' && friendsCount > 0 && 
+                  ` (${friendsCount})`}
+                {tab === 'requests' && requestsCount > 0 && 
+                  ` (${requestsCount})`}
+              </Text>
+            </Animated.View>
+          </Pressable>
+        );
+      })}
+      <Animated.View style={indicatorStyle} />
+    </View>
+  );
+}

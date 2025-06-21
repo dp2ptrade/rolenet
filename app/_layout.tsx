@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { initializeDebugging } from '../debug.config';
+
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider, MD3LightTheme } from 'react-native-paper';
@@ -30,6 +32,9 @@ const theme = {
   },
 };
 
+
+// Initialize upload debugging
+initializeDebugging();
 export default function RootLayout() {
   useFrameworkReady();
   

@@ -4,11 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, IconButton, Avatar, Appbar, Surface, ActivityIndicator, Divider, Chip } from 'react-native-paper';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useUserStore } from '@/stores/useUserStore';
-import { useChatStore } from '@/stores/useChatStore';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { supabase } from '../lib/supabase';
 import { chatService } from '../lib/supabaseService';
-import { ASSETS } from '@/constants/assets';
 import MediaPicker from '@/components/MediaPicker';
 import { ChatService } from '@/lib/supabaseService';
 
@@ -27,20 +25,8 @@ interface Message {
   isPinned?: boolean; // Whether the message is pinned
 }
 
-export default function ChatScreen() {
-  const { userId, userName, userRole, userAvatar, pingId, chatId, chatName, isGroup, participants } = useLocalSearchParams();
-  const isGroupChat = isGroup === 'true';
-
-  // Redirect to group chat screen if it's a group chat
-  useEffect(() => {
-    if (isGroupChat && chatId) {
-      router.push({
-        pathname: '/groupChat',
-        params: { chatId, chatName, participants }
-      });
-    }
-  }, [isGroupChat, chatId, chatName, participants]);
-
+export default function GroupChatScreen() {
+  const { chatId, chatName, participants } = useLocalSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -58,87 +44,31 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<RNTextInput>(null);
   const currentUser = useUserStore((state: any) => state.user);
-  const chatStore = useChatStore();
   const { friends } = useFriendStore();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  let chatData: any[] = []; // Temporary variable to store chat data for typing broadcast
   const groupParticipants = participants ? JSON.parse(participants as string) : [];
 
-    useEffect(() => {
-    if (!currentUser?.id) return;
-    let targetChatId = chatId as string | undefined;
+  useEffect(() => {
+    if (!currentUser?.id || !chatId) return;
 
-    // Load chat history
+    // Load chat history for group chat
     const fetchMessages = async () => {
       try {
-        let chatIds: string[] = [];
-        if (!targetChatId && userId) {
-          // For one-on-one chat, find chats strictly between the two users
-          const { data: chatDataResult, error: chatError } = await supabase
-            .from('chats')
-            .select('*')
-            .eq('participants', `{${[currentUser.id, userId].sort().join(',')}}`);
+        console.log('Fetching messages for group chat ID:', chatId);
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', { ascending: true });
 
-          if (chatError) {
-            console.error('Error finding chats for one-on-one chat:', chatError);
-            return;
-          }
-
-          chatData = chatDataResult; // Store for later use in typing broadcast
-          console.log('Found chats for one-on-one:', chatDataResult);
-
-          if (chatDataResult && chatDataResult.length > 0) {
-            chatIds = chatDataResult.map(chat => chat.id);
-            targetChatId = chatIds[0]; // Use the first chat ID as the primary for new messages
-            console.log('Using chat IDs for one-on-one chat:', chatIds);
-          } else {
-            // Create a new chat if none exists
-            console.log('No existing chat found, creating a new one for one-on-one chat');
-            const { data: newChat, error: newChatError } = await supabase
-              .from('chats')
-              .insert({
-                participants: [currentUser.id, userId],
-              })
-              .select()
-              .single();
-
-            if (newChatError) {
-              console.error('Error creating chat for one-on-one:', newChatError);
-              return;
-            }
-            targetChatId = newChat.id;
-            chatIds = [newChat.id];
-            chatData = [newChat];
-            console.log('Created new chat for one-on-one with ID:', newChat.id);
-          }
-        } else if (targetChatId) {
-          chatIds = [targetChatId];
-          console.log('Using provided chat ID:', targetChatId);
+        if (error) {
+          console.error(`Error loading messages for group chat ${chatId}:`, error);
+          return;
         }
 
-        // Fetch messages for all relevant chats
-        let allMessages: any[] = [];
-        for (const id of chatIds) {
-          console.log('Fetching messages for chat ID:', id);
-          const { data, error } = await supabase
-            .from('messages')
-            .select('*')
-            .eq('chat_id', id)
-            .order('created_at', { ascending: true });
-
-          if (error) {
-            console.error(`Error loading messages for chat ${id}:`, error);
-            continue;
-          }
-
-          console.log(`Fetched ${data?.length || 0} messages for chat ${id}`);
-          if (data) {
-            allMessages = allMessages.concat(data);
-          }
-        }
-
-        if (allMessages.length > 0) {
-          const formattedMessages = allMessages.map(msg => ({
+        console.log(`Fetched ${data?.length || 0} messages for group chat ${chatId}`);
+        if (data && data.length > 0) {
+          const formattedMessages = data.map(msg => ({
             id: msg.id,
             text: msg.text,
             sender_id: msg.sender_id,
@@ -152,12 +82,8 @@ export default function ChatScreen() {
             mediaType: msg.media_type || undefined,
             isPinned: msg.is_pinned || false,
           }));
-          // Ensure no duplicates by filtering based on ID
-          const uniqueMessages = formattedMessages.filter((msg, index, self) =>
-            index === self.findIndex((m) => m.id === msg.id)
-          );
           // Sort by timestamp to show messages in chronological order
-          const sortedMessages = uniqueMessages.sort((a, b) => 
+          const sortedMessages = formattedMessages.sort((a, b) => 
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
           );
           setMessages(sortedMessages);
@@ -172,63 +98,24 @@ export default function ChatScreen() {
           setMessageAnimations(animations);
         }
       } catch (error) {
-        console.error('Error fetching messages:', error);
+        console.error('Error fetching messages for group chat:', error);
       }
     };
 
     fetchMessages();
 
-    // Subscribe to real-time messages and typing status
-    let subscriptions: any[] = [];
+    // Subscribe to real-time messages and typing status for group chat
+    let subscription: any = null;
     const setupSubscription = async () => {
       try {
-        let chatIds: string[] = [];
-        if (!targetChatId && userId) {
-          // For one-on-one chat, find only direct chats strictly between the two users
-          const { data: chatDataResult, error: chatError } = await supabase
-            .from('chats')
-            .select('*')
-            .eq('participants', `{${[currentUser.id, userId].sort().join(',')}}`);
-
-          if (chatError) {
-            console.error('Error finding chats for subscription:', chatError);
-            return;
-          }
-
-          if (chatDataResult && chatDataResult.length > 0) {
-            chatIds = chatDataResult.map(chat => chat.id);
-            targetChatId = chatIds[0]; // Use the first chat ID as the primary for new messages
-          } else {
-            // Create a new chat if none exists
-            const { data: newChat, error: newChatError } = await supabase
-              .from('chats')
-              .insert({
-                participants: [currentUser.id, userId],
-              })
-              .select()
-              .single();
-
-            if (newChatError) {
-              console.error('Error creating chat for subscription:', newChatError);
-              return;
-            }
-            targetChatId = newChat.id;
-            chatIds = [newChat.id];
-          }
-        } else if (targetChatId) {
-          chatIds = [targetChatId];
-        }
-
-        // Subscribe to each chat ID for real-time updates
-        subscriptions = chatIds.map(chatId => {
-          return supabase
-            .channel(`chat:${chatId}`)
-            .on('postgres_changes', {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'messages',
-              filter: `chat_id=eq.${chatId}`
-            }, (payload) => {
+        subscription = supabase
+          .channel(`chat:${chatId}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `chat_id=eq.${chatId}`
+          }, (payload) => {
             const newMessage = {
               id: payload.new.id,
               text: payload.new.text,
@@ -252,20 +139,13 @@ export default function ChatScreen() {
               });
             }
             setMessages(prev => {
-              // Check if message with this ID already exists or if it's a replacement for a temporary ID
-              const existingIndex = prev.findIndex(msg => 
-                msg.id === newMessage.id || (msg.isOwn && msg.id.startsWith('temp-') && newMessage.isOwn && Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 5000)
-              );
-              let updatedMessages;
-              if (existingIndex !== -1) {
-                // Update existing message if it's a match (likely replacing a temp ID)
-                updatedMessages = [...prev];
-                updatedMessages[existingIndex] = newMessage;
-              } else {
-                updatedMessages = [...prev, newMessage].sort((a, b) => 
-                  new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                );
+              // Check if message with this ID already exists
+              if (prev.some(msg => msg.id === newMessage.id)) {
+                return prev;
               }
+              const updatedMessages = [...prev, newMessage].sort((a, b) => 
+                new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+              );
               // Add animation for the new message
               setMessageAnimations(animations => {
                 const newAnimation = new Animated.Value(0);
@@ -284,100 +164,46 @@ export default function ChatScreen() {
               return updatedMessages;
             });
           })
-            .on('postgres_changes', {
-              event: 'DELETE',
-              schema: 'public',
-              table: 'messages',
-              filter: `chat_id=eq.${chatId}`
-            }, (payload) => {
-              // Remove the deleted message from state
-              setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
-              // Also remove from pinned messages if it was pinned
-              setPinnedMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
-            })
-            .on('broadcast', { event: 'typing' }, (payload) => {
-              if (isGroupChat) {
-                // For group chats, handle typing from any participant
-                if (groupParticipants.includes(payload.userId)) {
-                  setOtherUserTyping(payload.isTyping);
-                }
-              } else if (payload.userId === userId) {
-                setOtherUserTyping(payload.isTyping);
-              }
-            })
-            .subscribe();
-        });
+          .on('postgres_changes', {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages',
+            filter: `chat_id=eq.${chatId}`
+          }, (payload) => {
+            // Remove the deleted message from state
+            setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
+            // Also remove from pinned messages if it was pinned
+            setPinnedMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
+          })
+          .on('broadcast', { event: 'typing' }, (payload) => {
+            // For group chats, handle typing from any participant
+            if (groupParticipants.includes(payload.userId)) {
+              setOtherUserTyping(payload.isTyping);
+            }
+          })
+          .subscribe();
       } catch (error) {
-        console.error('Error setting up chat subscription:', error);
+        console.error('Error setting up group chat subscription:', error);
       }
     };
 
     setupSubscription();
 
-    // Add initial message about the ping if provided
-    if (pingId && messages.length === 0 && !isGroupChat) {
-      const initialMessage: Message = {
-        id: `ping-context-${Date.now()}`,
-        text: `This chat was started in response to your ping. How can I help you?`,
-        sender_id: userId as string,
-        chat_id: '',
-        timestamp: new Date().toISOString(),
-        isOwn: false,
-        status: 'sent',
-      };
-      setMessages([initialMessage]);
-    }
-
     return () => {
-      subscriptions.forEach(sub => sub.unsubscribe());
-      subscriptions = [];
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
-  }, [userId, currentUser?.id, pingId, chatId, isGroup, participants]);
+  }, [currentUser?.id, chatId, participants]);
 
   const sendMessage = async () => {
-    if (!inputText.trim() || !currentUser?.id) return;
-    let targetChatId = chatId as string | undefined;
-
-    if (!targetChatId && userId) {
-      // For one-on-one chat, find or create a direct chat strictly between the two users
-      const { data: chatDataResult, error: chatError } = await supabase
-        .from('chats')
-        .select('*')
-        .eq('participants', `{${[currentUser.id, userId].sort().join(',')}}`)
-        .limit(1);
-
-      if (chatError) {
-        console.error('Error finding chat for sending message:', chatError);
-        return;
-      }
-
-      if (chatDataResult && chatDataResult.length > 0) {
-        targetChatId = chatDataResult[0].id;
-      } else {
-        // Create a new chat if none exists
-        const { data: newChat, error: newChatError } = await supabase
-          .from('chats')
-          .insert({
-            participants: [currentUser.id, userId],
-          })
-          .select()
-          .single();
-
-        if (newChatError) {
-          console.error('Error creating chat for sending message:', newChatError);
-          return;
-        }
-        targetChatId = newChat.id;
-      }
-    }
-
-    if (!targetChatId) return;
+    if (!inputText.trim() || !currentUser?.id || !chatId) return;
 
     const newMessage: Message = {
       id: `temp-${Date.now()}-${Math.floor(Math.random() * 10000).toString(16)}`,
       text: inputText.trim(),
       sender_id: currentUser.id,
-      chat_id: targetChatId,
+      chat_id: chatId as string,
       timestamp: new Date().toISOString(),
       isOwn: true,
       status: 'sent',
@@ -388,13 +214,13 @@ export default function ChatScreen() {
     setInputText('');
     setIsTyping(false);
     setReplyToMessageId(null); // Reset reply after sending
-    broadcastTypingStatus(targetChatId, false);
+    broadcastTypingStatus(chatId as string, false);
 
     try {
       const { data, error } = await supabase
         .from('messages')
         .insert({
-          chat_id: targetChatId,
+          chat_id: chatId,
           sender_id: currentUser.id,
           text: inputText.trim(),
           status: 'sent',
@@ -414,7 +240,7 @@ export default function ChatScreen() {
         ));
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error sending message in group chat:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
       ));
@@ -430,7 +256,7 @@ export default function ChatScreen() {
         payload: { userId: currentUser.id, isTyping },
       });
     } catch (error) {
-      console.error('Error broadcasting typing status:', error);
+      console.error('Error broadcasting typing status in group chat:', error);
     }
   };
 
@@ -438,16 +264,12 @@ export default function ChatScreen() {
     setInputText(text);
     if (!isTyping && text.length > 0) {
       setIsTyping(true);
-      if (chatData && chatData.length > 0) {
-        broadcastTypingStatus(chatData[0].id, true);
-      } else if (chatId) {
+      if (chatId) {
         broadcastTypingStatus(chatId as string, true);
       }
     } else if (isTyping && text.length === 0) {
       setIsTyping(false);
-      if (chatData && chatData.length > 0) {
-        broadcastTypingStatus(chatData[0].id, false);
-      } else if (chatId) {
+      if (chatId) {
         broadcastTypingStatus(chatId as string, false);
       }
     }
@@ -459,9 +281,7 @@ export default function ChatScreen() {
     if (text.length > 0) {
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        if (chatData && chatData.length > 0) {
-          broadcastTypingStatus(chatData[0].id, false);
-        } else if (chatId) {
+        if (chatId) {
           broadcastTypingStatus(chatId as string, false);
         }
       }, 2000);
@@ -501,7 +321,7 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const sender = isGroupChat ? friends.find(f => f.id === item.sender_id) : null;
+    const sender = friends.find(f => f.id === item.sender_id);
     return (
       <Animated.View 
         style={[
@@ -514,11 +334,9 @@ export default function ChatScreen() {
           <Avatar.Image
             size={32}
             source={
-              isGroupChat 
-                ? { uri: sender?.avatar || 'https://via.placeholder.com/150?text=No+Image' } 
-                : userAvatar 
-                  ? { uri: userAvatar as string } 
-                  : ASSETS.IMAGES.LOGO
+              sender?.avatar 
+                ? { uri: sender.avatar } 
+                : { uri: 'https://via.placeholder.com/150?text=No+Image' }
             }
             style={styles.messageAvatar}
           />
@@ -533,7 +351,7 @@ export default function ChatScreen() {
             ]}
             elevation={2}
           >
-            {isGroupChat && !item.isOwn && sender && (
+            {!item.isOwn && sender && (
               <Text style={styles.senderName}>{sender.name}</Text>
             )}
             {item.replyTo && (
@@ -568,8 +386,6 @@ export default function ChatScreen() {
                 style={styles.fileContainer}
                 onPress={() => {
                   if (item.mediaUrl) {
-                    // Open file in browser or external app
-                    // You can use Linking.openURL(item.mediaUrl) here
                     console.log('Opening file:', item.mediaUrl);
                   }
                 }}
@@ -682,17 +498,13 @@ export default function ChatScreen() {
     <View style={[styles.messageContainer, styles.otherMessage]}>
       <Avatar.Image
         size={32}
-        source={
-          userAvatar 
-            ? { uri: userAvatar as string } 
-            : { uri: 'https://via.placeholder.com/150?text=No+Image' }
-        }
+        source={{ uri: 'https://via.placeholder.com/150?text=No+Image' }}
         style={styles.messageAvatar}
       />
       <Surface style={[styles.messageBubble, styles.otherBubble, styles.typingBubble]} elevation={1}>
         <ActivityIndicator size="small" color="#6B7280" />
         <Text style={[styles.messageText, styles.otherText, styles.typingText]}>
-          {isGroupChat ? 'Someone is typing...' : 'Typing...'}
+          Someone is typing...
         </Text>
       </Surface>
     </View>
@@ -738,13 +550,11 @@ export default function ChatScreen() {
     const index = messages.findIndex(msg => msg.id === messageId);
     if (index !== -1 && flatListRef.current) {
       try {
-        // Check if index is within valid range
         if (index < messages.length) {
           flatListRef.current.scrollToIndex({ index, animated: true });
         }
       } catch (error) {
         console.warn('Failed to scroll to message, using scrollToEnd instead:', error);
-        // Fallback to scrolling to end if index is out of range
         flatListRef.current.scrollToEnd({ animated: true });
       }
     }
@@ -754,7 +564,6 @@ export default function ChatScreen() {
     if (!currentUser?.id) return;
 
     try {
-      // Fetch current reactions for the message
       const { data: messageData, error } = await supabase
         .from('messages')
         .select('reactions')
@@ -800,7 +609,6 @@ export default function ChatScreen() {
   const startEditingMessage = (messageId: string, currentText: string) => {
     setEditingMessage({ id: messageId, text: currentText });
     setContextMenuVisible(false);
-    // Note: In a real implementation, a text input modal would be shown for editing.
   };
 
   const saveEditedMessage = async () => {
@@ -828,7 +636,7 @@ export default function ChatScreen() {
 
   const deleteMessage = async (messageId: string) => {
     try {
-      console.log('Chat component: Deleting message with ID:', messageId);
+      console.log('GroupChat component: Deleting message with ID:', messageId);
       const { error } = await chatService.deleteMessage(messageId);
 
       if (error) {
@@ -836,19 +644,15 @@ export default function ChatScreen() {
         return;
       }
 
-      // Let the Realtime subscription handle the state update
-      // If Realtime is not working, we'll still update the local state as a fallback
-      console.log('Chat component: Message deleted successfully, waiting for Realtime event');
+      console.log('GroupChat component: Message deleted successfully, waiting for Realtime event');
       
-      // Set a timeout to update the local state if the Realtime event doesn't arrive
       const timeoutId = setTimeout(() => {
-        console.log('Chat component: Realtime event not received, updating local state as fallback');
+        console.log('GroupChat component: Realtime event not received, updating local state as fallback');
         setMessages(prev => prev.filter(msg => msg.id !== messageId));
         setPinnedMessages(prev => prev.filter(msg => msg.id !== messageId));
-      }, 2000); // Wait 2 seconds for Realtime event
+      }, 2000);
       
-      // Store the timeout ID to clear it if the component unmounts or if Realtime event is received
-      // @ts-ignore - Adding a custom property to the window object
+      // @ts-ignore
       window._deleteMessageTimeouts = window._deleteMessageTimeouts || {};
       // @ts-ignore
       window._deleteMessageTimeouts[messageId] = timeoutId;
@@ -860,14 +664,13 @@ export default function ChatScreen() {
   };
 
   const handleMediaSelected = async (media: { uri: string; type: string; name?: string; size?: number }) => {
-    console.log('💬 Media selected in chat:', {
+    console.log('💬 Media selected in group chat:', {
       uri: media.uri,
       type: media.type,
       name: media.name,
       size: media.size,
       currentUserId: currentUser?.id,
-      chatId: chatId,
-      userId: userId
+      chatId: chatId
     });
     
     if (!currentUser?.id) {
@@ -880,7 +683,6 @@ export default function ChatScreen() {
     console.log('💬 Starting media upload process...');
     
     try {
-      // Validate media before upload
       if (!media.uri) {
         throw new Error('Invalid media: No URI provided');
       }
@@ -892,7 +694,6 @@ export default function ChatScreen() {
       console.log('💬 Calling ChatService.uploadMedia...');
       const uploadStartTime = Date.now();
       
-      // Upload media to Supabase Storage using the updated method
       const publicUrl = await ChatService.uploadMedia(media.uri, 'chat-media');
       
       const uploadDuration = Date.now() - uploadStartTime;
@@ -906,17 +707,15 @@ export default function ChatScreen() {
         throw new Error('Upload succeeded but no public URL returned');
       }
     } catch (error) {
-      console.error('💥 Media upload failed in chat:', {
+      console.error('💥 Media upload failed in group chat:', {
         error,
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
         media,
         currentUserId: currentUser?.id,
-        chatId,
-        userId
+        chatId
       });
       
-      // Show user-friendly error message based on error type
       let errorMessage = 'Failed to upload media. Please try again.';
       if (error instanceof Error) {
         if (error.message.includes('size exceeds')) {
@@ -936,45 +735,8 @@ export default function ChatScreen() {
   };
 
   const sendMediaMessage = async (mediaUrl: string, mediaType: 'image' | 'file', fileName?: string) => {
-    if (!currentUser?.id) return;
-    let targetChatId = chatId as string | undefined;
+    if (!currentUser?.id || !chatId) return;
 
-    if (!targetChatId && userId) {
-      // For one-on-one chat, find or create a chat strictly between the two users
-      const { data: chatDataResult, error: chatError } = await supabase
-        .from('chats')
-        .select('*')
-        .eq('participants', `{${[currentUser.id, userId].sort().join(',')}}`)
-        .limit(1);
-
-      if (chatError) {
-        console.error('Error finding chat for sending media:', chatError);
-        return;
-      }
-
-      if (chatDataResult && chatDataResult.length > 0) {
-        targetChatId = chatDataResult[0].id;
-      } else {
-        // Create a new chat if none exists
-        const { data: newChat, error: newChatError } = await supabase
-          .from('chats')
-          .insert({
-            participants: [currentUser.id, userId],
-          })
-          .select()
-          .single();
-
-        if (newChatError) {
-          console.error('Error creating chat for sending media:', newChatError);
-          return;
-        }
-        targetChatId = newChat.id;
-      }
-    }
-
-    if (!targetChatId) return;
-
-    // Generate a unique temporary ID for media messages
     const generateUUID = () => {
       const timestamp = Date.now();
       const randomPart = Math.floor(Math.random() * 10000).toString(16);
@@ -987,7 +749,7 @@ export default function ChatScreen() {
       id: generateUUID(),
       text: messageText,
       sender_id: currentUser.id,
-      chat_id: targetChatId,
+      chat_id: chatId as string,
       timestamp: new Date().toISOString(),
       isOwn: true,
       status: 'sent',
@@ -1000,11 +762,11 @@ export default function ChatScreen() {
     setInputText('');
     setIsTyping(false);
     setReplyToMessageId(null);
-    broadcastTypingStatus(targetChatId, false);
+    broadcastTypingStatus(chatId as string, false);
 
     try {
       const { data, error } = await ChatService.sendMessage(
-        targetChatId,
+        chatId as string,
         currentUser.id,
         messageText,
         mediaUrl,
@@ -1016,13 +778,12 @@ export default function ChatScreen() {
       }
 
       if (data) {
-        // Update the message ID with the actual ID from the database
         setMessages(prev => prev.map(msg => 
           msg.id === newMessage.id ? { ...msg, id: data.id } : msg
         ));
       }
     } catch (error) {
-      console.error('Error sending media message:', error);
+      console.error('Error sending media message in group chat:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === newMessage.id ? { ...msg, status: 'sent' } : msg
       ));
@@ -1031,7 +792,6 @@ export default function ChatScreen() {
 
   const setReplyToMessage = (messageId: string) => {
     setReplyToMessageId(messageId);
-    // Highlight the message being replied to or show a preview in the input area
     if (inputRef.current) {
       inputRef.current.focus();
     }
@@ -1061,7 +821,7 @@ export default function ChatScreen() {
           <View key={item.date}>
             {renderDateHeader(item.date)}
             {item.data.map((msg: Message, index: number) => (
-              <View key={msg.id ? `msg-${msg.id}-${msg.chat_id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` : `${item.date}-${index}-${msg.timestamp || Date.now()}-${Math.random().toString(36).substring(2, 7)}`}>
+              <View key={msg.id ? `msg-${msg.id}-${msg.chat_id}` : `${item.date}-${index}-${msg.timestamp || Date.now()}`}>
                 {renderMessage({ item: msg })}
               </View>
             ))}
@@ -1080,71 +840,42 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
         <Appbar.BackAction onPress={() => router.back()} />
-        {isGroupChat ? (
-          <Avatar.Icon
-            size={40}
-            icon="account-group"
-            style={styles.headerAvatar}
-          />
-        ) : (
-          <Avatar.Image
-            size={40}
-            source={
-              userAvatar 
-                ? { uri: userAvatar as string } 
-                : { uri: 'https://via.placeholder.com/150?text=No+Image' }
-            }
-            style={styles.headerAvatar}
-          />
-        )}
+        <Avatar.Icon
+          size={40}
+          icon="account-group"
+          style={styles.headerAvatar}
+        />
         <Appbar.Content
-          title={isGroupChat ? (chatName as string) : (userName as string)}
-          subtitle={isGroupChat ? `${groupParticipants.length} members` : (userRole as string)}
+          title={chatName as string}
+          subtitle={`${groupParticipants.length} members`}
           titleStyle={styles.headerTitle}
           subtitleStyle={styles.headerSubtitle}
         />
-        {!isGroupChat && (
-          <Appbar.Action icon="phone" onPress={() => {
-            router.push({
-              pathname: '/call',
-              params: { userId, userName, userRole, userAvatar, pingId }
-            });
-          }} />
-        )}
       </Appbar.Header>
 
       <KeyboardAvoidingView
         style={styles.content}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {pingId && !isGroupChat && (
-          <Surface style={styles.pingBanner} elevation={1}>
-            <Text style={styles.pingBannerText}>
-              💬 Chat started from ping response
-            </Text>
-          </Surface>
-        )}
-        {isGroupChat && (
-          <Surface style={styles.groupInfoBanner} elevation={1}>
-            <Text style={styles.groupInfoText}>
-              Group Chat • {groupParticipants.length} Members
-            </Text>
-            <View style={styles.participantsChips}>
-              {groupParticipants.map((participantId: string) => {
-                const participant = participantId === currentUser.id ? currentUser : friends.find(f => f.id === participantId);
-                return participant ? (
-                  <Chip
-                    key={participantId}
-                    mode="outlined"
-                    style={styles.participantChip}
-                  >
-                    {participant.name}
-                  </Chip>
-                ) : null;
-              }).filter(Boolean)}
-            </View>
-          </Surface>
-        )}
+        <Surface style={styles.groupInfoBanner} elevation={1}>
+          <Text style={styles.groupInfoText}>
+            Group Chat • {groupParticipants.length} Members
+          </Text>
+          <View style={styles.participantsChips}>
+            {groupParticipants.map((participantId: string) => {
+              const participant = participantId === currentUser.id ? currentUser : friends.find(f => f.id === participantId);
+              return participant ? (
+                <Chip
+                  key={participantId}
+                  mode="outlined"
+                  style={styles.participantChip}
+                >
+                  {participant.name}
+                </Chip>
+              ) : null;
+            }).filter(Boolean)}
+          </View>
+        </Surface>
         {pinnedMessages.length > 0 && (
           <Surface style={styles.pinnedMessagesBanner} elevation={1}>
             <Text style={styles.pinnedMessagesTitle}>Pinned Messages</Text>
@@ -1161,7 +892,6 @@ export default function ChatScreen() {
                     if (isMessageVisible) {
                       scrollToMessage(msg.id);
                     } else {
-                      // Show a toast or alert that message is not in current view
                       console.log('Pinned message not in current chat view');
                     }
                   }}
@@ -1322,18 +1052,30 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  pingBanner: {
-    backgroundColor: '#EBF8FF',
+  groupInfoBanner: {
+    backgroundColor: '#F0FDF4',
     padding: 12,
     margin: 16,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#22C55E',
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+  },
+  groupInfoText: {
+    color: '#15803D',
+    marginBottom: 8,
+  },
+  participantsChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  participantChip: {
+    marginRight: 8,
+    marginBottom: 8,
   },
   pinnedMessagesBanner: {
     backgroundColor: '#FFF8E7',
@@ -1380,35 +1122,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,
-  },
-  pingBannerText: {
-    color: '#1E40AF',
-    textAlign: 'center',
-  },
-  groupInfoBanner: {
-    backgroundColor: '#F0FDF4',
-    padding: 12,
-    margin: 16,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#22C55E',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  groupInfoText: {
-    color: '#15803D',
-    marginBottom: 8,
-  },
-  participantsChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  participantChip: {
-    marginRight: 8,
-    marginBottom: 8,
   },
   messagesList: {
     flex: 1,

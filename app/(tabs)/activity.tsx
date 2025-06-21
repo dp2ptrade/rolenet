@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, ScrollView, RefreshControl, StyleSheet, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Button, Surface, Avatar, Chip, IconButton, Snackbar } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Clock } from 'lucide-react-native';
+import { Clock, Check, X, MessageSquare, Phone } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { usePingStore } from '@/stores/usePingStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { UserService } from '@/lib/supabaseService';
 import { Ping, User } from '@/lib/types';
 import { ASSETS } from '@/constants/assets';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing } from 'react-native-reanimated';
+import { COLORS } from '@/constants/theme';
+import { getAnimationConfig } from '@/utils/platform';
 
 // PingItem Component
 interface PingItemProps {
@@ -194,7 +197,6 @@ export default function ActivityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
-  
   const currentUser = useUserStore((state: any) => state.user);
 
   const showSnackbar = (message: string) => {
@@ -383,31 +385,14 @@ export default function ActivityScreen() {
 
       <View style={styles.content}>
         <View style={styles.tabContainer}>
-          <Surface style={styles.tabBar} elevation={2}>
-            <Button
-              mode={selectedTab === 'received' ? 'contained' : 'text'}
-              onPress={() => setSelectedTab('received')}
-              style={styles.tabButton}
-              compact
-            >
-              Received ({receivedPings.filter(p => p.status === 'pending').length})
-            </Button>
-            <Button
-              mode={selectedTab === 'sent' ? 'contained' : 'text'}
-              onPress={() => setSelectedTab('sent')}
-              style={styles.tabButton}
-              compact
-            >
-              Sent
-            </Button>
-            <Button
-              mode={selectedTab === 'responded' ? 'contained' : 'text'}
-              onPress={() => setSelectedTab('responded')}
-              style={styles.tabButton}
-              compact
-            >
-              Responded
-            </Button>
+          <Surface style={styles.tabBar} elevation={4}>
+            <TabSelector 
+              tabs={['received', 'sent', 'responded']} 
+              selectedTab={selectedTab} 
+              onSelectTab={setSelectedTab} 
+              labels={['Received', 'Sent', 'Responded']} 
+              pendingCount={receivedPings.filter(p => p.status === 'pending').length}
+            />
           </Surface>
         </View>
 
@@ -470,41 +455,129 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   header: {
-    padding: 24,
-    paddingTop: 16,
+    padding: 12,
+    paddingTop: 12,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   headerTitle: {
     color: 'white',
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   headerSubtitle: {
     color: 'rgba(255, 255, 255, 0.8)',
+    marginLeft: 12,
   },
   content: {
     flex: 1,
     paddingHorizontal: 16,
   },
   tabContainer: {
-    marginTop: -20,
+    marginTop: 10,
     marginBottom: 16,
+    paddingHorizontal: 8,
+    zIndex: 0,
   },
   tabBar: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 4,
-    flexDirection: 'row',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    height: 50,
+    overflow: 'hidden',
   },
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    height: 42, // Constrain the height to prevent excessive growth
+    position: 'relative',
+  },
+  tabItem: {
+    flex: 1,
+    height: 42,
+  },
+  tabItemContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8, // Reduced padding to fit within constrained height
+    paddingHorizontal: 4,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4B5563',
+    textAlign: 'center',
+  },
+  selectedTabText: {
+    color: '#1E40AF',
+    fontWeight: 'bold',
+  },
+  /* Removing old tab styles as they're no longer needed
   tabButton: {
     flex: 1,
     marginHorizontal: 2,
+    backgroundColor: 'transparent',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    minWidth: 0,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
+  activeTabButton: {
+    flex: 1,
+    marginHorizontal: 2,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    minWidth: 0,
+    borderBottomWidth: 2,
+    borderBottomColor: '#38BDF8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  activeTabText: {
+    color: '#1E40AF',
+    fontWeight: 'bold',
+  },
+  */
   scrollContent: {
     paddingBottom: 100,
   },
   emptyCard: {
     backgroundColor: 'white',
     marginTop: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   emptyContent: {
     alignItems: 'center',
@@ -513,22 +586,38 @@ const styles = StyleSheet.create({
   emptyTitle: {
     marginBottom: 8,
     color: '#374151',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   emptySubtitle: {
     color: '#6B7280',
     textAlign: 'center',
+    fontSize: 14,
+    paddingHorizontal: 20,
   },
   pingCard: {
     marginBottom: 16,
     backgroundColor: 'white',
-    elevation: 2,
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.15)',
+    overflow: 'hidden',
   },
   pingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    padding: 12,
+    borderRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(59, 130, 246, 0.1)',
   },
   userInfo: {
     flexDirection: 'row',
@@ -537,78 +626,239 @@ const styles = StyleSheet.create({
   userDetails: {
     marginLeft: 12,
     flex: 1,
+    justifyContent: 'center',
   },
   userName: {
     fontWeight: 'bold',
     marginBottom: 2,
+    fontSize: 16,
+    color: '#1F2937',
   },
   userRole: {
     color: '#6B7280',
+    fontSize: 14,
   },
   timeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   timeText: {
     marginLeft: 4,
     color: '#6B7280',
+    fontSize: 12,
   },
   message: {
     fontStyle: 'italic',
     color: '#374151',
     marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#38BDF8',
+    fontSize: 14,
+    lineHeight: 20,
   },
   statusContainer: {
     alignItems: 'flex-start',
     marginBottom: 16,
+    paddingHorizontal: 12,
   },
   statusChip: {
     alignSelf: 'flex-start',
+    paddingVertical: 2,
+    paddingHorizontal: 10,
+    borderRadius: 14,
   },
   pendingChip: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
   },
   respondedChip: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   ignoredChip: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   statusText: {
     fontSize: 12,
+    fontWeight: '500',
   },
   pendingText: {
-    color: '#92400E',
+    color: '#38BDF8',
   },
   respondedText: {
-    color: '#065F46',
+    color: '#10B981',
   },
   ignoredText: {
-    color: '#991B1B',
+    color: '#EF4444',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
+    padding: 10,
+    backgroundColor: 'rgba(59, 130, 246, 0.03)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(59, 130, 246, 0.1)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   callButton: {
     flex: 1,
+    backgroundColor: '#38BDF8',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   chatButton: {
     flex: 1,
+    backgroundColor: 'rgba(56, 189, 248, 0.3)',
+    borderRadius: 8,
   },
   ignoreButton: {
     flex: 1,
+    borderColor: '#0EA5E9',
+    borderWidth: 1,
+    borderRadius: 8,
   },
   actionButtonContent: {
-    paddingVertical: 4,
+    paddingVertical: 6,
   },
   snackbar: {
-    backgroundColor: '#1F2937',
+    backgroundColor: 'rgba(31, 41, 55, 0.9)',
+    borderRadius: 8,
   },
 });
+
+// Custom animated tab selector component
+interface TabSelectorProps {
+  tabs: string[];
+  selectedTab: string;
+  onSelectTab: React.Dispatch<React.SetStateAction<'received' | 'sent' | 'responded'>>;
+  labels: string[];
+  pendingCount: number;
+}
+
+function TabSelector({ tabs, selectedTab, onSelectTab, labels, pendingCount }: TabSelectorProps) {
+  // Create animated values for the indicator
+  const indicatorPosition = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+  
+  // References to measure tab widths
+  const tabRefs = useRef<(React.RefObject<View>)[]>(tabs.map(() => React.createRef<View>()));
+  const tabWidths = useRef<number[]>(tabs.map(() => 0));
+  const tabPositions = useRef<number[]>(tabs.map(() => 0));
+  const isLayoutCalculated = useRef<boolean>(false);
+  
+  // Update indicator position when tab changes
+  useEffect(() => {
+    if (isLayoutCalculated.current) {
+      const index = tabs.indexOf(selectedTab);
+      if (index !== -1) {
+        indicatorPosition.value = withTiming(tabPositions.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+        indicatorWidth.value = withTiming(tabWidths.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+      }
+    }
+  }, [selectedTab]);
+
+  // Function to handle layout calculation
+  const handleTabLayout = (index: number) => (event: any) => {
+    const { width, x } = event.nativeEvent.layout;
+    tabWidths.current[index] = width;
+    tabPositions.current[index] = x;
+    // Check if all tabs have been measured
+    if (tabWidths.current.every(w => w > 0)) {
+      isLayoutCalculated.current = true;
+      // Initialize indicator position for the selected tab
+      const selectedIndex = tabs.indexOf(selectedTab);
+      if (selectedIndex !== -1) {
+        indicatorPosition.value = tabPositions.current[selectedIndex];
+        indicatorWidth.value = tabWidths.current[selectedIndex];
+      }
+    }
+  };
+  
+  // Animated style for the indicator
+  const indicatorStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      bottom: 0,
+      left: indicatorPosition.value,
+      width: indicatorWidth.value,
+      height: 3,
+      backgroundColor: '#38BDF8',
+      borderRadius: 1.5,
+    };
+  });
+  
+  return (
+    <View style={styles.tabSelectorContainer}>
+      {tabs.map((tab: string, index: number) => {
+        const isSelected = tab === selectedTab;
+        
+        // Create animated styles for each tab
+        const tabAnimatedStyle = useAnimatedStyle(() => {
+          return {
+            opacity: withTiming(isSelected ? 1 : 0.7, { duration: 200 }),
+            transform: [
+              { 
+                scale: withTiming(isSelected ? 1.05 : 1, { 
+                  duration: 200,
+                  easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+                })
+              }
+            ],
+          };
+        });
+        
+        return (
+          <Pressable
+            key={tab}
+            ref={tabRefs.current[index]}
+            style={styles.tabItem}
+            onLayout={handleTabLayout(index)}
+            onPress={() => {
+              // Add a small bounce effect when pressed
+              if (tab !== selectedTab) {
+                onSelectTab(tab as 'received' | 'sent' | 'responded');
+              }
+            }}
+          >
+            <Animated.View style={[styles.tabItemContent, tabAnimatedStyle]}>
+              <Text 
+                style={[styles.tabText, isSelected && styles.selectedTabText]}
+              >
+                {labels[index]}
+                {tab === 'received' && pendingCount > 0 && 
+                  ` (${pendingCount})`
+                }
+              </Text>
+            </Animated.View>
+          </Pressable>
+        );
+      })}
+      <Animated.View style={indicatorStyle} />
+    </View>
+  );
+}
+
+// Remove the unnecessary comment at the end of the file

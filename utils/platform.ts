@@ -29,6 +29,7 @@ export const getAnimationConfig = (config: {
   duration?: number;
   tension?: number;
   friction?: number;
+  easing?: any;
 }) => ({
   ...config,
   useNativeDriver: !isWeb,

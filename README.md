@@ -18,7 +18,7 @@ RoleNet is a real-time, professional matchmaking app that allows users from any 
 
 - Node.js (v18 or higher) try v18 for smooth installion. 
 - Expo CLI  (npm install -g expo-cli)
-- EAS cli (npm install -g eas-cli) (for building apk)
+- EAS cli (npm install -g eas-cli) (for building apk) or npm install -g eas-cli@latest
 - Supabase account and project
 
 ### Installation
@@ -80,6 +80,8 @@ For Android:
 
 ```bash
 npm run android
+
+or npx expo run:android
 ```
 To build an APK that you can share with testers, run:
 ```bash
@@ -104,8 +106,22 @@ If you want to build locally and get the APK file directly on your machine:
 ```bash
 eas build -p android --profile development --local
 ```
+if showing error, try
+```bash
+eas build -p android --profile development --local --clear
+```
 
 
+or try,
+
+```bash
+eas build --platform android
+```
+if showing error/loading, use
+
+```bash
+eas build --platform android --no-wait
+```
 
 ## Distributing the APK
 After the build completes, you'll receive a URL where you can download the APK. You can share this URL with your testers, or download the APK and distribute it directly.

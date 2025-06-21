@@ -70,6 +70,7 @@ CREATE TABLE chats (
   last_message TEXT,
   last_message_time TIMESTAMP WITH TIME ZONE,
   unread_count JSONB DEFAULT '{}', -- {user_id: count}
+  is_pinned BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -83,6 +84,7 @@ CREATE TABLE messages (
   media_url TEXT,
   type TEXT DEFAULT 'text' CHECK (type IN ('text', 'image', 'audio', 'video')),
   status TEXT DEFAULT 'sent' CHECK (status IN ('sent', 'delivered', 'read')),
+  is_pinned BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

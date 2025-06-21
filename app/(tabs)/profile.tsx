@@ -295,6 +295,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   headerContent: {
     gap: 20,
@@ -316,6 +324,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 3,
     borderColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   profileInfo: {
     flex: 1,
@@ -352,6 +365,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   viewButton: {
     flex: 1,
@@ -368,8 +382,14 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
     backgroundColor: 'white',
-    elevation: 2,
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4.65,
+    elevation: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
   },
   sectionTitle: {
     fontWeight: 'bold',
@@ -384,6 +404,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+    padding: 10,
+    borderRadius: 12,
   },
   contactText: {
     marginLeft: 12,
@@ -398,14 +421,14 @@ const styles = StyleSheet.create({
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 6,
   },
   tagText: {
-    color: '#1E40AF',
+    color: '#0EA5E9',
     fontWeight: '500',
   },
   signOutButton: {

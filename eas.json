@@ -6,13 +6,31 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDevelopmentDebug"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleStagingRelease"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "env": {
+        "RELEASE_STORE_PASSWORD": "${RELEASE_STORE_PASSWORD}",
+        "RELEASE_KEY_ALIAS": "${RELEASE_KEY_ALIAS}",
+        "RELEASE_KEY_PASSWORD": "${RELEASE_KEY_PASSWORD}",
+        "RELEASE_STORE_FILE": "${RELEASE_STORE_FILE}"
+      }
     }
   },
   "submit": {

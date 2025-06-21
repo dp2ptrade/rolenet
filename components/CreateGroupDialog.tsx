@@ -57,7 +57,7 @@ export const CreateGroupDialog = ({ visible, onDismiss }: { visible: boolean; on
           {friends.length > 0 ? (
             friends.map((friend, index) => (
               <Chip
-                key={`${friend.id}-${index}`}
+                key={`friend-chip-${friend.id}`}
                 mode="outlined"
                 selected={selectedParticipants.includes(friend.id)}
                 onPress={() => toggleParticipant(friend.id)}
