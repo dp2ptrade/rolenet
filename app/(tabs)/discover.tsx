@@ -536,7 +536,7 @@ useEffect(() => {
               tintColor="white"
             />
             <Text variant="headlineMedium" style={styles.headerTitle}>
-              ROLE NET (TEST)
+              ROLE NET
             </Text>
           </View>
           <TouchableOpacity 
