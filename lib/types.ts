@@ -68,6 +68,7 @@ export interface Chat {
 
 export interface Message {
   id: string;
+  chat_id?: string;
   senderId: string;
   text?: string;
   mediaUrl?: string;

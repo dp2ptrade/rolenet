@@ -14,7 +14,7 @@ import { CreateGroupDialog } from '@/components/CreateGroupDialog';
 export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUserStore();
-  const { chats, loadUserChats, isLoading } = useChatStore();
+  const { chats, loadUserChats, isLoading, subscribeToAllChats, unsubscribeFromAllChats } = useChatStore();
   const { friends } = useFriendStore();
   const [refreshing, setRefreshing] = useState(false);
   const [createGroupDialogVisible, setCreateGroupDialogVisible] = useState(false);
@@ -24,8 +24,15 @@ export default function ChatsScreen() {
       loadUserChats(user.id, 20);
       // Load friends data when the chats page is accessed
       useFriendStore.getState().loadFriends(user.id);
+      // Subscribe to global chat updates for real-time chat list updates
+      subscribeToAllChats(user.id);
     }
-  }, [user?.id]);
+
+    // Cleanup subscription when component unmounts or user changes
+    return () => {
+      unsubscribeFromAllChats();
+    };
+  }, [user?.id, subscribeToAllChats, unsubscribeFromAllChats]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -57,6 +64,15 @@ export default function ChatsScreen() {
     }
   });
 
+  // Sort chats by most recent activity (last_message_time or updated_at)
+  const sortChatsByActivity = (chats: Chat[]) => {
+    return chats.sort((a, b) => {
+      const timeA = a.last_message_time || a.updated_at;
+      const timeB = b.last_message_time || b.updated_at;
+      return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+  };
+
   // Separate pinned chats
   const pinnedUserChats: [string, Chat[]][] = [];
   const unpinnedUserChats: [string, Chat[]][] = [];
@@ -64,16 +80,33 @@ export default function ChatsScreen() {
     const friend = friends.find(f => f.id === userId);
     const chatName = friend?.name || 'Unknown';
     if (chatName.toLowerCase().includes(searchQuery.toLowerCase())) {
-      if (chats.some(chat => chat.isPinned)) {
-        pinnedUserChats.push([userId, chats]);
+      // Sort chats for this user by activity
+      const sortedChats = sortChatsByActivity([...chats]);
+      if (sortedChats.some(chat => chat.isPinned)) {
+        pinnedUserChats.push([userId, sortedChats]);
       } else {
-        unpinnedUserChats.push([userId, chats]);
+        unpinnedUserChats.push([userId, sortedChats]);
       }
     }
   });
 
-  const pinnedGroupChats = groupChats.filter(chat => chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
-  const unpinnedGroupChats = groupChats.filter(chat => !chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Sort group chats by activity
+  const sortedGroupChats = sortChatsByActivity([...groupChats]);
+  const pinnedGroupChats = sortedGroupChats.filter(chat => chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const unpinnedGroupChats = sortedGroupChats.filter(chat => !chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  // Sort pinned and unpinned user chats by most recent activity
+  pinnedUserChats.sort(([, chatsA], [, chatsB]) => {
+    const timeA = chatsA[0].last_message_time || chatsA[0].updated_at;
+    const timeB = chatsB[0].last_message_time || chatsB[0].updated_at;
+    return new Date(timeB).getTime() - new Date(timeA).getTime();
+  });
+
+  unpinnedUserChats.sort(([, chatsA], [, chatsB]) => {
+    const timeA = chatsA[0].last_message_time || chatsA[0].updated_at;
+    const timeB = chatsB[0].last_message_time || chatsB[0].updated_at;
+    return new Date(timeB).getTime() - new Date(timeA).getTime();
+  });
 
   return (
     <SafeAreaView style={styles.container}>

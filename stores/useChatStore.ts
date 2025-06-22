@@ -9,6 +9,7 @@ interface ChatState {
   isLoading: boolean;
   subscription: any;
   currentSubscriptionChatId?: string; // Track the current chat ID we're subscribed to
+  globalChatSubscription: any; // Global subscription for all chat updates
   unreadChatsCount: number;
   
   // Basic setters
@@ -27,6 +28,8 @@ interface ChatState {
   loadChatMessages: (chatId: string, limit?: number) => Promise<void>;
   subscribeToMessages: (chatId: string) => void;
   unsubscribeFromMessages: () => void;
+  subscribeToAllChats: (userId: string) => void;
+  unsubscribeFromAllChats: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -36,6 +39,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoading: false,
   subscription: null,
   currentSubscriptionChatId: undefined,
+  globalChatSubscription: null,
   unreadChatsCount: 0,
   
   // Basic setters
@@ -48,8 +52,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setLoading: (loading) => set({ isLoading: loading }),
   
   addMessage: (message) => {
-    const { messages } = get();
+    const { messages, chats, currentChat } = get();
     set({ messages: [...messages, message] });
+    
+    // Update the corresponding chat's last message and timestamp
+    const updatedChats = chats.map(chat => {
+      if (chat.id === message.chat_id || 
+          (currentChat && chat.id === currentChat.id)) {
+        return {
+          ...chat,
+          last_message: message.text || 'Media message',
+          last_message_time: new Date(message.timestamp),
+          updated_at: new Date(message.timestamp),
+          unread_count: chat.id === currentChat?.id ? chat.unread_count : (chat.unread_count || 0) + 1
+        };
+      }
+      return chat;
+    });
+    
+    // Sort chats by most recent activity
+    const sortedChats = updatedChats.sort((a, b) => {
+      const timeA = a.last_message_time || a.updated_at;
+      const timeB = b.last_message_time || b.updated_at;
+      return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+    
+    set({ chats: sortedChats });
     get().updateUnreadCount();
   },
   
@@ -141,18 +169,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const { messages, chats } = get();
       set({ messages: [...messages, newMessage] });
       
-      // Update chat's last message in chats list
+      // Update chat's last message and move it to the top of the list
+      const now = new Date();
       const updatedChats = chats.map(chat => 
         chat.id === chatId 
           ? { 
               ...chat, 
               last_message: text,
-              last_message_time: new Date()
+              last_message_time: now,
+              updated_at: now
             }
           : chat
       );
       
-      set({ chats: updatedChats });
+      // Sort chats by most recent activity (last_message_time or updated_at)
+      const sortedChats = updatedChats.sort((a, b) => {
+        const timeA = a.last_message_time || a.updated_at;
+        const timeB = b.last_message_time || b.updated_at;
+        return new Date(timeB).getTime() - new Date(timeA).getTime();
+      });
+      
+      set({ chats: sortedChats });
     } catch (error) {
       console.error('Send message error:', error);
       throw error;
@@ -210,22 +247,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const deletedMessage = payload.old;
         console.log('useChatStore: Deleting message:', deletedMessage.id);
         
-        const { messages, pinnedMessages } = get();
+        const { messages } = get();
         console.log('useChatStore: Current message count:', messages.length);
-        console.log('useChatStore: Current pinned message count:', pinnedMessages.length);
         
-        // Filter out the deleted message from both messages and pinnedMessages
-        const updatedMessages = messages.filter(msg => msg.id !== deletedMessage.id);
-        const updatedPinnedMessages = pinnedMessages.filter(msg => msg.id !== deletedMessage.id);
+        // Filter out the deleted message from messages
+        const updatedMessages = messages.filter((msg: Message) => msg.id !== deletedMessage.id);
         
         // Update the state
         set({ 
-          messages: updatedMessages,
-          pinnedMessages: updatedPinnedMessages 
+          messages: updatedMessages
         });
         
         console.log('useChatStore: New message count:', updatedMessages.length);
-        console.log('useChatStore: New pinned message count:', updatedPinnedMessages.length);
         
         // Clear any fallback timeout for this message
         // @ts-ignore - Accessing custom property
@@ -254,6 +287,65 @@ export const useChatStore = create<ChatState>((set, get) => ({
         subscription: null,
         currentSubscriptionChatId: undefined 
       });
+    }
+  },
+
+  subscribeToAllChats: (userId) => {
+    const { globalChatSubscription } = get();
+    
+    // Unsubscribe from existing global subscription if any
+    if (globalChatSubscription) {
+      globalChatSubscription.unsubscribe();
+    }
+    
+    console.log('Subscribing to all chat updates for user:', userId);
+    
+    // Subscribe to all message inserts to update chat list order
+    const newGlobalSubscription = realtimeService.subscribeToAllMessages((payload) => {
+      console.log('Global chat subscription: Received message payload:', payload.eventType);
+      
+      if (payload.eventType === 'INSERT' && payload.new) {
+        const newMessage = payload.new;
+        const { chats, currentChat } = get();
+        
+        // Only update if this message is for a chat the user participates in
+        const relevantChat = chats.find(chat => chat.id === newMessage.chat_id);
+        if (relevantChat) {
+          const updatedChats = chats.map(chat => {
+            if (chat.id === newMessage.chat_id) {
+              return {
+                ...chat,
+                last_message: newMessage.text || 'Media message',
+                last_message_time: new Date(newMessage.timestamp),
+                updated_at: new Date(newMessage.timestamp),
+                unread_count: chat.id === currentChat?.id ? chat.unread_count : (chat.unread_count || 0) + 1
+              };
+            }
+            return chat;
+          });
+          
+          // Sort chats by most recent activity
+          const sortedChats = updatedChats.sort((a, b) => {
+            const timeA = a.last_message_time || a.updated_at;
+            const timeB = b.last_message_time || b.updated_at;
+            return new Date(timeB).getTime() - new Date(timeA).getTime();
+          });
+          
+          set({ chats: sortedChats });
+          get().updateUnreadCount();
+        }
+      }
+    });
+    
+    set({ globalChatSubscription: newGlobalSubscription });
+  },
+
+  unsubscribeFromAllChats: () => {
+    const { globalChatSubscription } = get();
+    if (globalChatSubscription) {
+      console.log('Unsubscribing from global chat updates');
+      globalChatSubscription.unsubscribe();
+      set({ globalChatSubscription: null });
     }
   },
 }));

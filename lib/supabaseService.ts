@@ -803,6 +803,24 @@ export class RealtimeService {
       }, wrappedCallback)
       .subscribe();
   }
+
+  static subscribeToAllMessages(callback: (payload: any) => void) {
+    console.log('RealtimeService: Subscribing to all messages');
+    
+    const wrappedCallback = (payload: any) => {
+      console.log('RealtimeService: Received global message event:', payload.eventType);
+      callback(payload);
+    };
+    
+    return supabase
+      .channel('all-messages')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+      }, wrappedCallback)
+      .subscribe();
+  }
 }
 
 // Service instances for easier importing

@@ -252,10 +252,11 @@ const WelcomeGuideScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BACKGROUND,
+    backgroundColor: '#0284c7', // Fallback color to match the darkest gradient color
   },
   safeArea: {
     flex: 1,
+    backgroundColor: '#0284c7', // Ensure the safe area also has a consistent background
   },
   gradient: {
     flex: 1,
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     flexGrow: 1,
     padding: SPACING.MD,
-    paddingBottom: SPACING.XL,
+    paddingBottom: SPACING.MD, // Reduced padding to minimize extra space at the bottom
   },
   header: {
     alignItems: 'center',

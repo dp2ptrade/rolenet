@@ -225,6 +225,11 @@ CREATE POLICY "Users can send messages in their chats" ON messages FOR INSERT WI
     SELECT 1 FROM chats WHERE chats.id = messages.chat_id AND auth.uid() = ANY(chats.participants)
   )
 );
+CREATE POLICY "Users can update messages in their chats" ON messages FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM chats WHERE chats.id = messages.chat_id AND auth.uid() = ANY(chats.participants)
+  )
+);
 
 -- Ratings policies
 CREATE POLICY "Users can view ratings for any user" ON ratings FOR SELECT USING (true);

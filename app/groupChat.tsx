@@ -23,6 +23,7 @@ interface Message {
   mediaUrl?: string; // URL for media or file attachment
   mediaType?: 'image' | 'file'; // Type of media attachment
   isPinned?: boolean; // Whether the message is pinned
+  _isLocalMessage?: boolean; // Flag to prevent duplicate from real-time subscription
 }
 
 export default function GroupChatScreen() {
@@ -139,8 +140,13 @@ export default function GroupChatScreen() {
               });
             }
             setMessages(prev => {
-              // Check if message with this ID already exists
-              if (prev.some(msg => msg.id === newMessage.id)) {
+              // Check if message with this ID already exists or if it's a duplicate from the current user
+              if (prev.some(msg => msg.id === newMessage.id) || 
+                  (newMessage.isOwn && prev.some(msg => 
+                    msg.text === newMessage.text && 
+                    msg.sender_id === newMessage.sender_id && 
+                    Math.abs(new Date(msg.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 5000
+                  ))) {
                 return prev;
               }
               const updatedMessages = [...prev, newMessage].sort((a, b) => 
@@ -163,6 +169,52 @@ export default function GroupChatScreen() {
               });
               return updatedMessages;
             });
+          })
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `chat_id=eq.${chatId}`
+          }, (payload) => {
+            // Handle message updates (pin status, reactions, edits)
+            const updatedMessage = {
+              id: payload.new.id,
+              text: payload.new.text,
+              sender_id: payload.new.sender_id,
+              chat_id: payload.new.chat_id,
+              timestamp: payload.new.created_at,
+              isOwn: payload.new.sender_id === currentUser.id,
+              status: payload.new.status || 'sent',
+              reactions: payload.new.reactions || {},
+              replyTo: payload.new.reply_to || undefined,
+              mediaUrl: payload.new.media_url || undefined,
+              mediaType: payload.new.media_type || undefined,
+              isPinned: payload.new.is_pinned || false,
+            };
+            
+            // Update the message in the main messages array
+            setMessages(prev => prev.map(msg => 
+              msg.id === updatedMessage.id ? updatedMessage : msg
+            ));
+            
+            // Handle pinned messages updates
+            if (updatedMessage.isPinned) {
+              setPinnedMessages(prev => {
+                const existingIndex = prev.findIndex(msg => msg.id === updatedMessage.id);
+                if (existingIndex !== -1) {
+                  // Update existing pinned message
+                  const updated = [...prev];
+                  updated[existingIndex] = updatedMessage;
+                  return updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                } else {
+                  // Add new pinned message
+                  return [...prev, updatedMessage].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                }
+              });
+            } else {
+              // Remove from pinned messages if unpinned
+              setPinnedMessages(prev => prev.filter(msg => msg.id !== updatedMessage.id));
+            }
           })
           .on('postgres_changes', {
             event: 'DELETE',
@@ -234,10 +286,17 @@ export default function GroupChatScreen() {
       }
 
       if (data) {
-        // Update the message ID with the actual ID from the database
+        // Update the message ID with the actual ID from the database and mark it to prevent duplicate from real-time subscription
         setMessages(prev => prev.map(msg => 
-          msg.id === newMessage.id ? { ...msg, id: data.id } : msg
+          msg.id === newMessage.id ? { ...msg, id: data.id, _isLocalMessage: true } : msg
         ));
+        
+        // Clean up the _isLocalMessage flag after a short delay to prevent duplicates from real-time subscription
+        setTimeout(() => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === data.id ? { ...msg, _isLocalMessage: undefined } : msg
+          ));
+        }, 2000);
       }
     } catch (error) {
       console.error('Error sending message in group chat:', error);
@@ -821,7 +880,7 @@ export default function GroupChatScreen() {
           <View key={item.date}>
             {renderDateHeader(item.date)}
             {item.data.map((msg: Message, index: number) => (
-              <View key={msg.id ? `msg-${msg.id}-${msg.chat_id}` : `${item.date}-${index}-${msg.timestamp || Date.now()}`}>
+              <View key={msg.id ? `${item.date}-msg-${msg.id}` : `${item.date}-${index}-${msg.timestamp || Date.now()}`}>
                 {renderMessage({ item: msg })}
               </View>
             ))}

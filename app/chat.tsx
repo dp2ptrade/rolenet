@@ -285,6 +285,54 @@ export default function ChatScreen() {
             });
           })
             .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'messages',
+              filter: `chat_id=eq.${chatId}`
+            }, (payload) => {
+              // Handle message updates (pin status, reactions, edits)
+              console.log('🔧 UPDATE event received:', payload);
+              const updatedMessage = {
+                id: payload.new.id,
+                text: payload.new.text,
+                sender_id: payload.new.sender_id,
+                chat_id: payload.new.chat_id,
+                timestamp: payload.new.created_at,
+                isOwn: payload.new.sender_id === currentUser.id,
+                status: payload.new.status || 'sent',
+                reactions: payload.new.reactions || {},
+                replyTo: payload.new.reply_to || undefined,
+                mediaUrl: payload.new.media_url || undefined,
+                mediaType: payload.new.media_type || undefined,
+                isPinned: payload.new.is_pinned || false,
+              };
+              console.log('🔧 Processed updated message:', updatedMessage);
+              
+              // Update the message in the main messages array
+              setMessages(prev => prev.map(msg => 
+                msg.id === updatedMessage.id ? updatedMessage : msg
+              ));
+              
+              // Handle pinned messages updates
+              if (updatedMessage.isPinned) {
+                setPinnedMessages(prev => {
+                  const existingIndex = prev.findIndex(msg => msg.id === updatedMessage.id);
+                  if (existingIndex !== -1) {
+                    // Update existing pinned message
+                    const updated = [...prev];
+                    updated[existingIndex] = updatedMessage;
+                    return updated.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                  } else {
+                    // Add new pinned message
+                    return [...prev, updatedMessage].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                  }
+                });
+              } else {
+                // Remove from pinned messages if unpinned
+                setPinnedMessages(prev => prev.filter(msg => msg.id !== updatedMessage.id));
+              }
+            })
+            .on('postgres_changes', {
               event: 'DELETE',
               schema: 'public',
               table: 'messages',
@@ -706,11 +754,15 @@ export default function ChatScreen() {
   };
 
   const togglePinMessage = async (messageId: string, pin: boolean) => {
+    console.log('🔧 togglePinMessage called:', { messageId, pin });
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .update({ is_pinned: pin })
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select();
+
+      console.log('🔧 Database update result:', { data, error });
 
       if (error) {
         console.error('Error toggling pin on message:', error);
@@ -752,6 +804,7 @@ export default function ChatScreen() {
 
   const addReaction = async (messageId: string, emoji: string) => {
     if (!currentUser?.id) return;
+    console.log('🔧 addReaction called:', { messageId, emoji, userId: currentUser.id });
 
     try {
       // Fetch current reactions for the message
@@ -760,6 +813,8 @@ export default function ChatScreen() {
         .select('reactions')
         .eq('id', messageId)
         .single();
+
+      console.log('🔧 Current reactions fetch result:', { messageData, error });
 
       if (error) {
         console.error('Error fetching message reactions:', error);
@@ -777,10 +832,15 @@ export default function ChatScreen() {
         updatedReactions[emoji].push(currentUser.id);
       }
 
-      const { error: updateError } = await supabase
+      console.log('🔧 Updated reactions:', updatedReactions);
+
+      const { data: updateData, error: updateError } = await supabase
         .from('messages')
         .update({ reactions: updatedReactions })
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select();
+
+      console.log('🔧 Reactions update result:', { updateData, updateError });
 
       if (updateError) {
         console.error('Error updating reactions:', updateError);
@@ -794,6 +854,23 @@ export default function ChatScreen() {
       setSelectedMessageId(null);
     } catch (error) {
       console.error('Error adding reaction:', error);
+    }
+  };
+
+  // Test function to verify pin/reaction functionality
+  const testPinAndReaction = async () => {
+    console.log('🧪 Testing pin and reaction functionality...');
+    if (messages.length > 0) {
+      const testMessage = messages[0];
+      console.log('🧪 Testing with message:', testMessage.id);
+      
+      // Test pin functionality
+      await togglePinMessage(testMessage.id, !testMessage.isPinned);
+      
+      // Test reaction functionality
+      await addReaction(testMessage.id, '👍');
+    } else {
+      console.log('🧪 No messages available for testing');
     }
   };
 
@@ -1103,6 +1180,7 @@ export default function ChatScreen() {
           titleStyle={styles.headerTitle}
           subtitleStyle={styles.headerSubtitle}
         />
+        <Appbar.Action icon="bug" onPress={testPinAndReaction} />
         {!isGroupChat && (
           <Appbar.Action icon="phone" onPress={() => {
             router.push({

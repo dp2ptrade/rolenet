@@ -598,41 +598,7 @@ useEffect(() => {
             )}
           />
         </View>
-        {/* Quick Filters */}
-        <View style={styles.quickFilters}>
-          <Chip
-            selected={filters.location === 'nearby'}
-            onPress={() => setFilters(prev => ({ ...prev, location: 'nearby' }))}
-            style={styles.quickFilterChip}
-          >
-            <Text>Nearby</Text>
-          </Chip>
-          <Chip
-            selected={filters.location === 'global'}
-            onPress={() => setFilters(prev => ({ ...prev, location: 'global' }))}
-            style={styles.quickFilterChip}
-          >
-            <Text>Global</Text>
-          </Chip>
-          <Chip
-            selected={filters.availability === 'available'}
-            onPress={() => setFilters(prev => ({ 
-              ...prev, 
-              availability: prev.availability === 'available' ? 'all' : 'available' 
-            }))}
-            style={styles.quickFilterChip}
-          >
-            <Text>Available</Text>
-          </Chip>
-          <Chip
-            onPress={() => setShowSuggestions(!showSuggestions)}
-            icon={showSuggestions ? "eye-off" : "eye"}
-            style={styles.quickFilterChipIconOnly}
-            compact
-          >
-            <Text>{showSuggestions ? "Hide" : "Show"}</Text>
-          </Chip>
-        </View>
+        {/* Quick Filters Removed */}
       </LinearGradient>
 
       <View style={styles.content}>
@@ -729,7 +695,6 @@ useEffect(() => {
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={styles.loadingText}>Searching for professionals...</Text>
             </View>
           )}
         </View>
@@ -889,8 +854,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerLogo: {
-    width: 35,
-    height: 35,
+    width: 50,
+    height: 50,
     marginRight: 10,
   },
   headerTitle: {
