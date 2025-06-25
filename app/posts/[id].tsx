@@ -6,7 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { usePostStore } from '@/stores/usePostStore';
 import { useUserStore } from '@/stores/useUserStore';
-import { Star, MapPin, Clock, Briefcase, Tag, Bookmark, BookmarkCheck, MessageSquare, Calendar, Award, Zap, Edit, Share2, ChevronLeft, Heart } from 'lucide-react-native';
+import { Star, MapPin, Clock, Briefcase, Tag, Bookmark, BookmarkCheck, MessageSquare, Calendar, Award, Zap, CreditCard as Edit, Share2, ChevronLeft, Heart } from 'lucide-react-native';
 import ServiceBundleCard from '@/components/ServiceBundleCard';
 import CaseStudyCard from '@/components/CaseStudyCard';
 import AvailabilityCalendar from '@/components/AvailabilityCalendar';
