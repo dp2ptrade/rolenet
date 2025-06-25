@@ -165,3 +165,112 @@ export const POPULAR_TAGS = [
   'Innovation', 'Technology', 'Creative', 'Leadership', 'Freelance',
   'Startup', 'Remote Work', 'Career Growth', 'Skills Development'
 ];
+
+// Post types
+export interface Post {
+  id: string;
+  title: string;
+  user_id: string;
+  category: string;
+  description: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  };
+  is_remote: boolean;
+  tags: string[];
+  price_type: 'fixed' | 'hourly' | 'free' | 'contact';
+  price?: number;
+  currency: string;
+  availability_date?: Date;
+  availability_status: 'available' | 'limited' | 'unavailable';
+  experience_level: 'junior' | 'mid' | 'senior';
+  service_type: 'one-time' | 'long-term' | 'consulting' | 'coaching';
+  media_urls: string[];
+  has_video_pitch: boolean;
+  has_voice_intro: boolean;
+  is_verified: boolean;
+  is_featured: boolean;
+  is_collaborative: boolean;
+  collaborators: string[];
+  success_rate?: number;
+  projects_completed: number;
+  avg_response_time?: number;
+  view_count: number;
+  rating: number;
+  rating_count: number;
+  created_at: Date;
+  updated_at: Date;
+  user?: User;
+  service_bundles?: ServiceBundle[];
+  case_studies?: CaseStudy[];
+  availability_slots?: AvailabilitySlot[];
+  ai_match_score?: number; // Calculated field
+}
+
+export interface PostBookmark {
+  id: string;
+  post_id: string;
+  user_id: string;
+  created_at: Date;
+}
+
+export interface PostRating {
+  id: string;
+  post_id: string;
+  user_id: string;
+  rating: number;
+  comment?: string;
+  created_at: Date;
+}
+
+export interface PostCategory {
+  id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  created_at: Date;
+}
+
+export interface PostTag {
+  id: string;
+  name: string;
+  category_id?: string;
+  created_at: Date;
+}
+
+export interface ServiceBundle {
+  id: string;
+  post_id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  delivery_time?: number; // in days
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AvailabilitySlot {
+  id: string;
+  post_id: string;
+  start_time: Date;
+  end_time: Date;
+  is_booked: boolean;
+  booked_by?: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CaseStudy {
+  id: string;
+  post_id: string;
+  title: string;
+  description: string;
+  results?: string;
+  media_urls: string[];
+  created_at: Date;
+  updated_at: Date;
+}

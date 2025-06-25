@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Search, Activity, Users, User, Bell, MessageCircle, Phone } from 'lucide-react-native';
+import { Search, Activity, Users, User, Bell, MessageCircle, Phone, FileText } from 'lucide-react-native';
 import { useTheme, Badge } from 'react-native-paper';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useChatStore } from '@/stores/useChatStore';
@@ -118,6 +118,15 @@ export default function TabLayout() {
               </>
             );
           },
+        }}
+      />
+      <Tabs.Screen
+        name="posts"
+        options={{
+          title: 'Posts',
+          tabBarIcon: ({ size, color }) => (
+            <FileText size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
