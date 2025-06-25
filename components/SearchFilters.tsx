@@ -16,6 +16,7 @@ import Slider from '@react-native-community/slider';
 import { X, Filter, Star, MapPin, Clock, Briefcase } from 'lucide-react-native';
 import { SearchFilters } from '@/lib/searchEngine';
 import { POPULAR_ROLES, POPULAR_TAGS } from '@/lib/types';
+import { CONFIG } from '@/lib/config/chatConfig';
 
 interface SearchFiltersProps {
   visible: boolean;
@@ -88,7 +89,7 @@ export default function SearchFiltersModal({
     if (localFilters.availability !== 'all') count++;
     if (localFilters.rating > 0) count++;
     if (localFilters.experience !== 'all') count++;
-    if (localFilters.distance !== 50) count++;
+    if (localFilters.distance !== CONFIG.SEARCH.DEFAULT_RADIUS_KM) count++;
     if (localFilters.sortBy !== 'relevance') count++;
     return count;
   };

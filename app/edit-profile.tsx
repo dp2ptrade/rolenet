@@ -62,16 +62,27 @@ export default function EditProfileScreen() {
 
       // Upload image to Supabase storage
       try {
-        const formData = new FormData();
-        formData.append('file', {
-          uri: selectedImage.uri,
-          name: fileName,
-          type: `image/${fileExt}`,
-        } as any);
+        let uploadData: any;
+        // Check if running on web or native
+        if (selectedImage.uri.startsWith('data:') || !selectedImage.uri.startsWith('file://')) {
+          // For web or non-file URIs, fetch and convert to Blob
+          const response = await fetch(selectedImage.uri);
+          const blob = await response.blob();
+          uploadData = blob;
+        } else {
+          // For native file URIs, use FormData
+          const formData = new FormData();
+          formData.append('file', {
+            uri: selectedImage.uri,
+            name: fileName,
+            type: `image/${fileExt}`,
+          } as any);
+          uploadData = formData;
+        }
 
         const { data, error } = await supabase.storage
           .from('avatars')
-          .upload(filePath, formData, { upsert: true });
+          .upload(filePath, uploadData, { upsert: true });
 
         if (error) {
           throw new Error(`Upload error: ${error.message || 'Unknown error'}`);
@@ -82,9 +93,17 @@ export default function EditProfileScreen() {
           .from('avatars')
           .getPublicUrl(filePath);
 
-        const newAvatarUrl = publicUrlData.publicUrl;
+        const newAvatarUrl = publicUrlData.publicUrl + `?t=${Date.now()}`;
         setAvatar(newAvatarUrl);
-        Alert.alert('Success', 'Avatar updated successfully!');
+        // Immediately update the avatar in the backend
+        const { error: updateError } = await UserService.updateUserProfile(user!.id, { avatar: newAvatarUrl });
+        if (updateError) {
+          Alert.alert('Error', 'Failed to update avatar in profile. Please save changes manually.');
+          console.error('Error updating avatar in profile:', updateError);
+        } else {
+          setCurrentUser({ ...user!, avatar: newAvatarUrl });
+          Alert.alert('Success', 'Avatar updated successfully!');
+        }
       } catch (error) {
         console.error('Error uploading avatar:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';

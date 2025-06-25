@@ -7,6 +7,8 @@ interface FriendState {
   friendRequests: Friend[];
   sentRequests: Friend[];
   isLoading: boolean;
+  friendStatuses: { [key: string]: { status: 'online' | 'offline' | 'away'; lastSeen: string | null } };
+  activeChannels: Map<string, any>;
   
   // Basic setters
   setFriends: (friends: User[]) => void;
@@ -17,6 +19,7 @@ interface FriendState {
   addFriendRequest: (request: Friend) => void;
   updateFriendRequest: (requestId: string, updates: Partial<Friend>) => void;
   setLoading: (loading: boolean) => void;
+  setFriendStatus: (userId: string, status: 'online' | 'offline' | 'away', lastSeen: string | null) => void;
   
   // Friend actions
   sendFriendRequest: (userA: string, userB: string) => Promise<void>;
@@ -25,6 +28,8 @@ interface FriendState {
   acceptFriendRequest: (requestId: string) => Promise<void>;
   declineFriendRequest: (requestId: string) => Promise<void>;
   unfriend: (userId: string, friendId: string) => Promise<void>;
+  subscribeToFriendStatuses: (userId: string) => Promise<void>;
+  unsubscribeFromFriendStatuses: () => void;
 }
 
 export const useFriendStore = create<FriendState>((set, get) => ({
@@ -32,12 +37,20 @@ export const useFriendStore = create<FriendState>((set, get) => ({
   friendRequests: [],
   sentRequests: [],
   isLoading: false,
+  friendStatuses: {},
+  activeChannels: new Map(),
   
   // Basic setters
   setFriends: (friends) => set({ friends }),
   setFriendRequests: (requests) => set({ friendRequests: requests }),
   setSentRequests: (requests) => set({ sentRequests: requests }),
   setLoading: (loading) => set({ isLoading: loading }),
+  setFriendStatus: (userId, status, lastSeen) => set(state => ({
+    friendStatuses: {
+      ...state.friendStatuses,
+      [userId]: { status, lastSeen }
+    }
+  })),
   
   addFriend: (friend) => {
     const { friends } = get();
@@ -110,6 +123,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
       );
       
       set({ friends: uniqueFriends });
+      
+      // Subscribe to status updates for friends
+      if (uniqueFriends.length > 0) {
+        get().subscribeToFriendStatuses(userId);
+      }
     } catch (error) {
       console.error('Load friends error:', error);
       throw error;
@@ -188,5 +206,77 @@ export const useFriendStore = create<FriendState>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+  subscribeToFriendStatuses: async (userId: string) => {
+    try {
+      set({ isLoading: true });
+      const { friends, activeChannels } = get();
+      const { supabase } = require('../lib/supabase');
+      
+      // Unsubscribe from existing channels first
+      get().unsubscribeFromFriendStatuses();
+      
+      // Fetch initial statuses for all friends
+      const friendIds = friends.map(friend => friend.id);
+      if (friendIds.length > 0) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, online_status, last_seen')
+          .in('id', friendIds);
+        
+        if (error) {
+          console.error('Error fetching initial friend statuses:', error);
+        } else if (data) {
+          const initialStatuses = data.reduce((acc: { [key: string]: { status: 'online' | 'offline' | 'away'; lastSeen: string | null } }, user: any) => {
+            acc[user.id] = { status: user.online_status, lastSeen: user.last_seen };
+            return acc;
+          }, {});
+          set({ friendStatuses: initialStatuses });
+        }
+      }
+      
+      // Subscribe to status changes for each friend
+      friendIds.forEach(friendId => {
+        const channelName = `user-status:${friendId}`;
+        
+        // Skip if already subscribed
+        if (activeChannels.has(channelName)) {
+          return;
+        }
+        
+        const channel = supabase.channel(channelName);
+        channel.on('broadcast', { event: 'status-change' }, (payload: any) => {
+          if (payload.userId === friendId) {
+            get().setFriendStatus(friendId, payload.status, payload.lastSeen);
+          }
+        }).subscribe();
+        
+        // Track the channel
+        activeChannels.set(channelName, channel);
+      });
+      
+      set({ activeChannels });
+    } catch (error) {
+      console.error('Error subscribing to friend statuses:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+  unsubscribeFromFriendStatuses: () => {
+    const { activeChannels } = get();
+    const { supabase } = require('../lib/supabase');
+    
+    // Unsubscribe from all active channels
+    activeChannels.forEach((channel, channelName) => {
+      try {
+        supabase.removeChannel(channel);
+      } catch (error) {
+        console.error(`Error unsubscribing from channel ${channelName}:`, error);
+      }
+    });
+    
+    // Clear the channels map
+    set({ activeChannels: new Map() });
+    console.log('Unsubscribed from all friend status updates');
   },
 }));

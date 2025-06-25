@@ -74,12 +74,7 @@ export default function SignUpScreen() {
       }
 
       if (data.user) {
-        if (Platform.OS === 'web') {
-          // For web, directly navigate to a confirmation message or page
-          router.push('/auth/signin?confirmation=true');
-        } else {
-          setShowConfirmationModal(true);
-        }
+        setShowConfirmationModal(true);
       }
     } catch (error) {
       console.error('Sign up error:', error);
@@ -192,35 +187,33 @@ export default function SignUpScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {Platform.OS !== 'web' && (
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={showConfirmationModal}
-          onRequestClose={() => setShowConfirmationModal(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text variant="headlineSmall" style={styles.modalTitle}>
-                Verify Your Email
-              </Text>
-              <Text variant="bodyMedium" style={styles.modalMessage}>
-                We've sent a confirmation link to your email address. Please check your inbox and verify your account before signing in.
-              </Text>
-              <Button
-                mode="contained"
-                onPress={() => {
-                  setShowConfirmationModal(false);
-                  router.replace('/auth/signin');
-                }}
-                style={styles.modalButton}
-              >
-                Go to Sign In
-              </Button>
-            </View>
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showConfirmationModal}
+        onRequestClose={() => setShowConfirmationModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text variant="headlineSmall" style={styles.modalTitle}>
+              Verify Your Email
+            </Text>
+            <Text variant="bodyMedium" style={styles.modalMessage}>
+              We've sent a confirmation link to your email address. Please check your inbox and verify your account before signing in.
+            </Text>
+            <Button
+              mode="contained"
+              onPress={() => {
+                setShowConfirmationModal(false);
+                router.replace('/auth/signin');
+              }}
+              style={styles.modalButton}
+            >
+              Go to Sign In
+            </Button>
           </View>
-        </Modal>
-      )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

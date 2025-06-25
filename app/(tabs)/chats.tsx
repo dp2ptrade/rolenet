@@ -2,26 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Card, Text, Surface, Searchbar, FAB, Portal } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MessageSquare, Plus } from 'lucide-react-native';
+import { MessageSquare, Plus, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUserStore } from '@/stores/useUserStore';
-import { useChatStore } from '@/stores/useChatStore';
-import { useFriendStore } from '@/stores/useFriendStore';
+import { useUserStore } from '../../stores/useUserStore';
+import { useChatStore } from '../../stores/useChatStore';
+import { useFriendStore } from '../../stores/useFriendStore';
 import { Chat } from '@/lib/types';
-import { ChatItem } from '@/components/ChatItem';
-import { CreateGroupDialog } from '@/components/CreateGroupDialog';
+import { ChatItem } from '../../components/ChatItem';
+import { CreateGroupDialog } from '../../components/CreateGroupDialog';
 
 export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'recent' | 'groups'>('recent');
   const { user } = useUserStore();
-  const { chats, loadUserChats, isLoading, subscribeToAllChats, unsubscribeFromAllChats } = useChatStore();
+  const { chats, loadUserChats, isLoading, subscribeToAllChats, unsubscribeFromAllChats, initializeOfflineSupport } = useChatStore();
   const { friends } = useFriendStore();
   const [refreshing, setRefreshing] = useState(false);
   const [createGroupDialogVisible, setCreateGroupDialogVisible] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
-      loadUserChats(user.id, 20);
+      // Initialize offline support and pagination first
+      initializeOfflineSupport(user.id);
+      loadUserChats(user.id, true);
       // Load friends data when the chats page is accessed
       useFriendStore.getState().loadFriends(user.id);
       // Subscribe to global chat updates for real-time chat list updates
@@ -32,14 +35,14 @@ export default function ChatsScreen() {
     return () => {
       unsubscribeFromAllChats();
     };
-  }, [user?.id, subscribeToAllChats, unsubscribeFromAllChats]);
+  }, [user?.id, subscribeToAllChats, unsubscribeFromAllChats, initializeOfflineSupport]);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
     if (user?.id) {
       // Load both chats and friends data in parallel
       await Promise.all([
-        loadUserChats(user.id, 20),
+        loadUserChats(user.id, true),
         useFriendStore.getState().loadFriends(user.id)
       ]);
     }
@@ -50,9 +53,28 @@ export default function ChatsScreen() {
   const groupedChats: { [key: string]: Chat[] } = {};
   const groupChats: Chat[] = [];
 
+  console.log('🔍 Processing all chats:', {
+    totalChats: chats.length,
+    currentUserId: user?.id,
+    chats: chats.map(c => ({ 
+      id: c.id, 
+      name: c.name, 
+      is_group: c.is_group, 
+      participants: c.participants,
+      created_by: c.created_by 
+    }))
+  });
+
   chats.forEach(chat => {
-    if (chat.participants.length > 2) {
-      groupChats.push(chat);
+    // Use is_group field to determine if it's a group chat
+    if (chat.is_group || chat.participants.length > 2) {
+      // Only include groups where the user is a participant
+      if (chat.participants.includes(user?.id || '')) {
+        console.log('✅ Adding group chat:', { id: chat.id, name: chat.name, created_by: chat.created_by });
+        groupChats.push(chat);
+      } else {
+        console.log('❌ User not in group participants:', { id: chat.id, name: chat.name, participants: chat.participants });
+      }
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
       if (otherUserId) {
@@ -79,7 +101,7 @@ export default function ChatsScreen() {
   Object.entries(groupedChats).forEach(([userId, chats]) => {
     const friend = friends.find(f => f.id === userId);
     const chatName = friend?.name || 'Unknown';
-    if (chatName.toLowerCase().includes(searchQuery.toLowerCase())) {
+    if (searchQuery === '' || chatName.toLowerCase().includes(searchQuery.toLowerCase())) {
       // Sort chats for this user by activity
       const sortedChats = sortChatsByActivity([...chats]);
       if (sortedChats.some(chat => chat.isPinned)) {
@@ -90,10 +112,72 @@ export default function ChatsScreen() {
     }
   });
 
-  // Sort group chats by activity
+  // Categorize and sort group chats
+  const categorizeGroupChats = (chats: Chat[]) => {
+    const createdGroups: Chat[] = [];
+    const joinedGroups: Chat[] = [];
+    
+    console.log('🔍 Categorizing group chats:', {
+      totalGroupChats: chats.length,
+      currentUserId: user?.id,
+      chats: chats.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_group: c.is_group }))
+    });
+    
+    chats.forEach(chat => {
+      const groupName = chat.name || `Group Chat (${chat.participants.length})`;
+      const matchesSearch = searchQuery === '' || groupName.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      console.log('📊 Processing chat:', {
+        chatId: chat.id,
+        chatName: groupName,
+        created_by: chat.created_by,
+        currentUserId: user?.id,
+        isCreatedByUser: chat.created_by === user?.id,
+        matchesSearch
+      });
+      
+      if (matchesSearch) {
+        if (chat.created_by === user?.id) {
+          console.log('✅ Adding to createdGroups:', chat.id);
+          createdGroups.push(chat);
+        } else {
+          console.log('✅ Adding to joinedGroups:', chat.id);
+          joinedGroups.push(chat);
+        }
+      }
+    });
+    
+    console.log('📈 Categorization result:', {
+      createdGroups: createdGroups.length,
+      joinedGroups: joinedGroups.length
+    });
+    
+    return { createdGroups, joinedGroups };
+  };
+  
   const sortedGroupChats = sortChatsByActivity([...groupChats]);
-  const pinnedGroupChats = sortedGroupChats.filter(chat => chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
-  const unpinnedGroupChats = sortedGroupChats.filter(chat => !chat.isPinned && `Group Chat (${chat.participants.length})`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const { createdGroups, joinedGroups } = categorizeGroupChats(sortedGroupChats);
+  
+  // Sort created and joined groups by activity, then separate pinned/unpinned
+  const sortedCreatedGroups = sortChatsByActivity([...createdGroups]);
+  const sortedJoinedGroups = sortChatsByActivity([...joinedGroups]);
+  
+  const pinnedCreatedGroups = sortedCreatedGroups.filter(chat => chat.isPinned);
+  const unpinnedCreatedGroups = sortedCreatedGroups.filter(chat => !chat.isPinned);
+  const pinnedJoinedGroups = sortedJoinedGroups.filter(chat => chat.isPinned);
+  const unpinnedJoinedGroups = sortedJoinedGroups.filter(chat => !chat.isPinned);
+  
+  // Combine all groups in priority order: pinned created, unpinned created, pinned joined, unpinned joined
+  const allGroupChats = [
+    ...pinnedCreatedGroups,
+    ...unpinnedCreatedGroups,
+    ...pinnedJoinedGroups,
+    ...unpinnedJoinedGroups
+  ];
+  
+  // For backward compatibility, keep the old variables but use new logic
+  const pinnedGroupChats = [...pinnedCreatedGroups, ...pinnedJoinedGroups];
+  const unpinnedGroupChats = [...unpinnedCreatedGroups, ...unpinnedJoinedGroups];
 
   // Sort pinned and unpinned user chats by most recent activity
   pinnedUserChats.sort(([, chatsA], [, chatsB]) => {
@@ -123,61 +207,126 @@ export default function ChatsScreen() {
       </LinearGradient>
 
       <View style={styles.content}>
-        <Searchbar
-          placeholder="Search chats..."
-          onChangeText={setSearchQuery}
-          value={searchQuery}
-          style={styles.searchbar}
-        />
+        <View style={styles.searchContainer}>
+          <View style={styles.searchShapeOverlay} />
+          <Searchbar
+            placeholder="Search chats..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchbar}
+            icon={({ size, color }) => <Search size={size} color={color} />}
+          />
+        </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          contentContainerStyle={styles.scrollContent}
-        >
-          {isLoading ? (
-            <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading chats...</Text>
-          ) : (pinnedUserChats.length === 0 && pinnedGroupChats.length === 0 && unpinnedUserChats.length === 0 && unpinnedGroupChats.length === 0) ? (
-            <Card style={styles.emptyCard}>
-              <Card.Content style={styles.emptyContent}>
-                <MessageSquare size={48} color="#6B7280" />
-                <Text variant="titleMedium" style={styles.emptyTitle}>
-                  No chats yet
-                </Text>
-                <Text variant="bodyMedium" style={styles.emptySubtitle}>
-                  Start a conversation with your friends or create a group
-                </Text>
-              </Card.Content>
-            </Card>
-          ) : (
-            <>
-              {(pinnedUserChats.length > 0 || pinnedGroupChats.length > 0) && (
+        <View style={styles.tabContainer}>
+          <Surface style={styles.tabBar}>
+            <View style={styles.tabItem}>
+              <Text 
+                style={[styles.tabText, activeTab === 'recent' && styles.activeTabText]} 
+                onPress={() => setActiveTab('recent')}
+              >
+                Recent Chats
+              </Text>
+              {activeTab === 'recent' && <View style={styles.activeTabIndicator} />}
+            </View>
+            <View style={styles.tabItem}>
+              <Text 
+                style={[styles.tabText, activeTab === 'groups' && styles.activeTabText]} 
+                onPress={() => setActiveTab('groups')}
+              >
+                Groups
+              </Text>
+              {activeTab === 'groups' && <View style={styles.activeTabIndicator} />}
+            </View>
+          </Surface>
+          
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            contentContainerStyle={styles.scrollContent}
+          >
+            {isLoading ? (
+              <Text style={{ textAlign: 'center', marginTop: 40 }}>Loading chats...</Text>
+            ) : activeTab === 'recent' ? (
+              (pinnedUserChats.length === 0 && unpinnedUserChats.length === 0) ? (
+                <Card style={styles.emptyCard}>
+                  <Card.Content style={styles.emptyContent}>
+                    <MessageSquare size={48} color="#6B7280" />
+                    <Text variant="titleMedium" style={styles.emptyTitle}>
+                      No recent chats
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.emptySubtitle}>
+                      Start a conversation with your friends
+                    </Text>
+                  </Card.Content>
+                </Card>
+              ) : (
                 <>
-                  <Text variant="titleMedium" style={styles.sectionTitle}>Pinned Chats</Text>
-                  {pinnedUserChats.map(([userId, userChats], index) => (
-                    <ChatItem key={`pinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
-                  ))}
-                  {pinnedGroupChats.map((chat, index) => (
-                    <ChatItem key={`pinned-group-${chat.id}`} chat={chat} />
-                  ))}
+                  {pinnedUserChats.length > 0 && (
+                    <>
+                      <Text variant="titleMedium" style={styles.sectionTitle}>Pinned Chats</Text>
+                      {pinnedUserChats.map(([userId, userChats], index) => (
+                        <ChatItem key={`pinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
+                      ))}
+                    </>
+                  )}
+                  {unpinnedUserChats.length > 0 && (
+                    <>
+                      <Text variant="titleMedium" style={styles.sectionTitle}>Recent Chats</Text>
+                      {unpinnedUserChats.map(([userId, userChats], index) => (
+                        <ChatItem key={`unpinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
+                      ))}
+                    </>
+                  )}
                 </>
-              )}
-              {(unpinnedUserChats.length > 0 || unpinnedGroupChats.length > 0) && (
+              )
+            ) : (
+              (allGroupChats.length === 0) ? (
+                <Card style={styles.emptyCard}>
+                  <Card.Content style={styles.emptyContent}>
+                    <MessageSquare size={48} color="#6B7280" />
+                    <Text variant="titleMedium" style={styles.emptyTitle}>
+                      No groups yet
+                    </Text>
+                    <Text variant="bodyMedium" style={styles.emptySubtitle}>
+                      Create a group to start chatting
+                    </Text>
+                  </Card.Content>
+                </Card>
+              ) : (
                 <>
-                  <Text variant="titleMedium" style={styles.sectionTitle}>Recent Chats</Text>
-                  {unpinnedUserChats.map(([userId, userChats], index) => (
-                    <ChatItem key={`unpinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
-                  ))}
-                  {unpinnedGroupChats.map((chat, index) => (
-                    <ChatItem key={`unpinned-group-${chat.id}`} chat={chat} />
-                  ))}
+                  {/* Created Groups Section */}
+                  {(pinnedCreatedGroups.length > 0 || unpinnedCreatedGroups.length > 0) && (
+                    <>
+                      <Text variant="titleMedium" style={styles.sectionTitle}>My Groups</Text>
+                      {pinnedCreatedGroups.map((chat, index) => (
+                        <ChatItem key={`pinned-created-${chat.id}`} chat={chat} />
+                      ))}
+                      {unpinnedCreatedGroups.map((chat, index) => (
+                        <ChatItem key={`unpinned-created-${chat.id}`} chat={chat} />
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Joined Groups Section */}
+                  {(pinnedJoinedGroups.length > 0 || unpinnedJoinedGroups.length > 0) && (
+                    <>
+                      <Text variant="titleMedium" style={styles.sectionTitle}>Joined Groups</Text>
+                      {pinnedJoinedGroups.map((chat, index) => (
+                        <ChatItem key={`pinned-joined-${chat.id}`} chat={chat} />
+                      ))}
+                      {unpinnedJoinedGroups.map((chat, index) => (
+                        <ChatItem key={`unpinned-joined-${chat.id}`} chat={chat} />
+                      ))}
+                    </>
+                  )}
                 </>
-              )}
-            </>
-          )}
-        </ScrollView>
+              )
+            )}
+          </ScrollView>
+        </View>
       </View>
 
       <FAB
@@ -230,18 +379,93 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
   },
+  searchContainer: {
+    marginBottom: 12,
+    marginTop: 8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+    position: 'relative',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+  },
+  searchShapeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderRadius: 16,
+    borderTopLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(56, 189, 248, 0.8)',
+    zIndex: 1,
+  },
   searchbar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 10,
-    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+    height: 42,
+    borderRadius: 14,
+    borderTopLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    paddingHorizontal: 16,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    zIndex: 2,
+  },
+  tabContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginBottom: 8,
+    padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
+    elevation: 2,
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    position: 'relative',
+  },
+  tabText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: '#3B82F6',
+    fontWeight: 'bold',
+  },
+  activeTabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: '20%',
+    right: '20%',
+    height: 2,
+    backgroundColor: '#3B82F6',
+    borderRadius: 2,
   },
   scrollContent: {
     paddingBottom: 100,

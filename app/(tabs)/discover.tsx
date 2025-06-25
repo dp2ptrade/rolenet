@@ -19,6 +19,9 @@ import { MapPin, Star, Phone, Filter, Sparkles, TrendingUp, Tag } from 'lucide-r
 import { LinearGradient } from 'expo-linear-gradient';
 import { useUserStore } from '@/stores/useUserStore';
 import { usePingStore } from '@/stores/usePingStore';
+import { useStatusStore } from '@/stores/useStatusStore';
+import { useAppStateStore } from '@/stores/useAppStateStore';
+import AnimatedStatusDot from '@/components/AnimatedStatusDot';
 import { ASSETS } from '@/constants/assets';
 import { User } from '@/lib/types';
 import { userService } from '@/lib/supabaseService';
@@ -28,6 +31,7 @@ import { VoiceSearchProcessor } from '@/lib/searchEngine';
 import SearchFiltersModal from '@/components/SearchFilters';
 import VoiceSearchButton from '@/components/VoiceSearchButton';
 import { router } from 'expo-router';
+import { CONFIG } from '@/lib/config/chatConfig';
 
 
 export default function DiscoverTestScreen() {
@@ -51,6 +55,8 @@ export default function DiscoverTestScreen() {
   
   const currentUser = useUserStore((state) => state.user);
   const { sendPing } = usePingStore();
+  const { userStatuses, subscribeToUserStatuses, unsubscribeFromUserStatuses } = useStatusStore();
+  const { updateActivity } = useAppStateStore();
 
   // Animation for the rotating logo
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -70,14 +76,14 @@ export default function DiscoverTestScreen() {
     sortBy: 'relevance'
   });
 
-useEffect(() => {
-  // Initialize voice search service
-  VoiceSearchService.configure({
-    elevenLabsApiKey: '', // Add your ElevenLabs API key here
-    voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
-  });
+  useEffect(() => {
+    // Initialize voice search service
+    VoiceSearchService.configure({
+      elevenLabsApiKey: '', // Add your ElevenLabs API key here
+      voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
+    });
 
-  let animationTimeout: NodeJS.Timeout;
+    let animationTimeout: any;
   
   // Start the rotation animation
   const startRotation = () => {
@@ -154,7 +160,7 @@ useEffect(() => {
   const loadUsers = async (appliedFilters: SearchFilters | null = null) => {
     try {
       setLoading(true);
-      const searchParams: any = { limit: 50 };
+      const searchParams: any = { limit: CONFIG.SEARCH.DEFAULT_LIMIT };
 
       // Apply filters if provided or if we have active filters
       const filtersToApply = appliedFilters || filters;
@@ -256,6 +262,17 @@ useEffect(() => {
     }
   }, [searchQuery, users]);
 
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      const userIds = searchResults.map(result => result.user.id);
+      subscribeToUserStatuses(userIds);
+    }
+    
+    return () => {
+      unsubscribeFromUserStatuses();
+    };
+  }, [searchResults]);
+
   const performSearch = () => {
     // Since filtering is now done at database level, we can directly use the loaded users as search results
     // But we still calculate relevance score and distance for display purposes
@@ -274,6 +291,7 @@ useEffect(() => {
   }, [currentUser?.id]);
 
   const handleSearch = (query: string) => {
+    updateActivity(); // Track user activity
     setSearchQuery(query);
     setFilters(prev => ({ ...prev, query }));
     setSuggestions([]);
@@ -329,6 +347,7 @@ useEffect(() => {
   }, [selectedUserId]);
 
   const handleSendPing = async () => {
+    updateActivity(); // Track user activity
     if (!currentUser?.id || !selectedUserId || !pingMessage.trim()) {
       setSnackbarMessage('Please enter a message');
       setSnackbarVisible(true);
@@ -417,7 +436,7 @@ useEffect(() => {
     if (filters.availability !== 'all') count++;
     if (filters.rating > 0) count++;
     if (filters.experience !== 'all') count++;
-    if (filters.distance !== 50) count++;
+    if (filters.distance !== CONFIG.SEARCH.DEFAULT_RADIUS_KM) count++;
     if (filters.sortBy !== 'relevance') count++;
     return count;
   };
@@ -447,6 +466,7 @@ useEffect(() => {
       }
     }, [user.online_status]);
 
+    const userStatus = userStatuses[user.id] || { status: user.online_status, lastSeen: null };
     return (
       <TouchableOpacity 
         style={styles.userListItem}
@@ -470,20 +490,16 @@ useEffect(() => {
           <View style={styles.nameRow}>
             <Text style={styles.userListName}>{user.name}</Text>
             <View style={styles.statusIndicator}>
-              <Animated.View 
-                style={[
-                  styles.statusDot,
-                  { 
-                    backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444',
-                    transform: [{ scale: user.online_status === 'online' ? pulseAnim : 1 }]
-                  }
-                ]}
+              <AnimatedStatusDot
+                status={userStatus.status}
+                size={8}
+                style={styles.statusDot}
               />
               <Text style={[
                 styles.statusText,
-                { color: user.online_status === 'online' ? '#10B981' : '#EF4444' }
+                { color: userStatus.status === 'online' ? '#10B981' : '#EF4444' }
               ]}>
-                {user.online_status === 'online' ? 'Online' : 'Offline'}
+                {userStatus.status === 'online' ? 'Online' : 'Offline'}
               </Text>
             </View>
           </View>
@@ -584,7 +600,7 @@ useEffect(() => {
             onSubmitEditing={() => handleSearch(searchQuery)}
             style={[styles.searchbar, { flex: 1 }]}
             icon={() => <Sparkles size={20} color="#6B7280" />}
-            right={(props: { color: string }) => (
+            right={() => (
               <View style={styles.optionIcon}>
                 <TouchableOpacity onPress={handleVoiceSearchClick}>
                   <LinearGradient
@@ -775,7 +791,7 @@ useEffect(() => {
                   numberOfLines={4}
                   placeholder="Write your ping message here..."
                   style={styles.pingInput}
-                  maxLength={500}
+                  maxLength={CONFIG.UI.MESSAGE_MAX_LENGTH}
                   autoCapitalize="sentences"
                   textAlignVertical="top"
                 />

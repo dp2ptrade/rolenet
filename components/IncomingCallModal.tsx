@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { Text, Avatar, IconButton, Surface } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,23 +30,60 @@ export default function IncomingCallModal({
 }: IncomingCallModalProps) {
   const { isLoading } = useCallStore();
 
-  const handleAccept = () => {
-    onAccept();
-    // Navigate to call screen
-    router.push({
-      pathname: '/call',
-      params: {
-        callId,
-        isIncoming: 'true',
-        userName: callerName,
-        userRole: callerRole,
-        userAvatar: callerAvatar
-      }
+  // Debug logging for modal visibility
+  useEffect(() => {
+    console.log('🎭 [IncomingCallModal] Visibility changed:', {
+      visible,
+      callerName,
+      callId,
+      callerRole,
+      hasAvatar: !!callerAvatar,
+      isLoading,
+      timestamp: new Date().toISOString()
     });
+  }, [visible, callerName, callId, callerRole, callerAvatar, isLoading]);
+
+  // Log when component mounts/unmounts
+  useEffect(() => {
+    console.log('🎭 [IncomingCallModal] Component mounted');
+    return () => {
+      console.log('🎭 [IncomingCallModal] Component unmounted');
+    };
+  }, []);
+
+  const handleAccept = () => {
+    console.log('✅ [IncomingCallModal] Accept button pressed:', { callId, callerName });
+    
+    try {
+      onAccept();
+      
+      // Navigate to call screen with error handling
+      console.log('🧭 [IncomingCallModal] Attempting navigation to call screen');
+      router.push({
+        pathname: '/call',
+        params: {
+          callId,
+          isIncoming: 'true',
+          userName: callerName,
+          userRole: callerRole,
+          userAvatar: callerAvatar
+        }
+      });
+      console.log('✅ [IncomingCallModal] Navigation initiated successfully');
+    } catch (error) {
+      console.error('❌ [IncomingCallModal] Error in handleAccept:', error);
+    }
   };
 
   const handleDecline = () => {
-    onDecline();
+    console.log('❌ [IncomingCallModal] Decline button pressed:', { callId, callerName });
+    
+    try {
+      onDecline();
+      console.log('✅ [IncomingCallModal] Call declined successfully');
+    } catch (error) {
+      console.error('❌ [IncomingCallModal] Error in handleDecline:', error);
+    }
   };
 
   return (

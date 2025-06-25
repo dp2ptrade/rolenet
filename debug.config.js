@@ -6,9 +6,10 @@
  */
 
 // Import debugging utilities
-import { enableNetworkDebugging, getNetworkStats } from './lib/networkDebugger';
-import { runUploadTests } from './lib/uploadTester';
-import { uploadWithRetry } from './lib/retryUpload';
+// Note: Debugging utilities are disabled to prevent bundling issues
+// import { enableNetworkDebugging, getNetworkStats } from './lib/networkDebugger';
+// import { runUploadTests } from './lib/uploadTester';
+// import { uploadWithRetry } from './lib/retryUpload';
 
 // Debug configuration
 export const DEBUG_CONFIG = {
@@ -39,17 +40,18 @@ export const DEBUG_CONFIG = {
 export function initializeDebugging() {
   console.log('🔍 Initializing upload debugging...');
   
-  if (DEBUG_CONFIG.enableNetworkDebugging) {
-    enableNetworkDebugging();
-    console.log('✅ Network debugging enabled');
-  }
+  // Temporarily disabled to prevent bundling issues
+  // if (DEBUG_CONFIG.enableNetworkDebugging) {
+  //   enableNetworkDebugging();
+  //   console.log('✅ Network debugging enabled');
+  // }
   
   // Make debugging functions globally available
   if (__DEV__) {
     global.debugUpload = {
-      getNetworkStats,
-      runUploadTests,
-      uploadWithRetry,
+      // getNetworkStats,
+      // runUploadTests,
+      // uploadWithRetry,
       config: DEBUG_CONFIG
     };
     

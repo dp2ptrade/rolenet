@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Pressable } from 'react-native';
 import { Card, Text, Avatar, Button, Surface, Searchbar, FAB, Portal, Dialog, Paragraph, TextInput } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Phone, MessageSquare, Star, UserPlus } from 'lucide-react-native';
+import { Phone, MessageSquare, Star, UserPlus, Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { User, Friend } from '@/lib/types';
 import { useUserStore } from '@/stores/useUserStore';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { UserService } from '@/lib/supabaseService';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withRepeat, Easing } from 'react-native-reanimated';
+import AnimatedStatusDot from '../../components/AnimatedStatusDot';
 
 export default function FriendsScreen() {
   const [selectedTab, setSelectedTab] = useState<'friends' | 'requests'>('friends');
@@ -18,11 +19,14 @@ export default function FriendsScreen() {
   const {
     friends,
     friendRequests,
+    friendStatuses,
     isLoading,
     loadFriends,
     loadFriendRequests,
     acceptFriendRequest,
-    declineFriendRequest
+    declineFriendRequest,
+    subscribeToFriendStatuses,
+    unsubscribeFromFriendStatuses
   } = useFriendStore();
   const [refreshing, setRefreshing] = useState(false);
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
@@ -35,7 +39,12 @@ export default function FriendsScreen() {
     if (user?.id) {
       loadFriends(user.id);
       loadFriendRequests(user.id);
+      subscribeToFriendStatuses(user.id);
     }
+    
+    return () => {
+      unsubscribeFromFriendStatuses();
+    };
   }, [user?.id]);
 
   useEffect(() => {
@@ -188,12 +197,16 @@ export default function FriendsScreen() {
         </View>
 
         {selectedTab === 'friends' && (
-          <Searchbar
-            placeholder="Search friends..."
-            onChangeText={setSearchQuery}
-            value={searchQuery}
-            style={styles.searchbar}
-          />
+          <View style={styles.searchContainer}>
+            <View style={styles.searchShapeOverlay} />
+            <Searchbar
+              placeholder="Search friends..."
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+              style={styles.searchbar}
+              icon={({ size, color }) => <Search size={size} color={color} />}
+            />
+          </View>
         )}
 
         <ScrollView
@@ -229,10 +242,11 @@ export default function FriendsScreen() {
                             size={60} 
                             source={{ uri: friend.avatar || undefined }} 
                           />
-                          <View style={[
-                            styles.statusDot,
-                            { backgroundColor: friend.online_status === 'online' ? '#10B981' : '#EF4444' }
-                          ]} />
+                          <AnimatedStatusDot
+                            status={friendStatuses[friend.id]?.status || 'offline'}
+                            size={12}
+                            style={styles.statusDot}
+                          />
                         </View>
                         
                         <View style={styles.userDetails}>
@@ -249,7 +263,7 @@ export default function FriendsScreen() {
                             </Text>
                           </View>
                           <Text variant="bodySmall" style={styles.lastSeen}>
-                            {getLastSeenText(friend.last_seen)}
+                            {friendStatuses[friend.id]?.lastSeen ? getLastSeenText(new Date(friendStatuses[friend.id].lastSeen || friend.last_seen)) : getLastSeenText(new Date(friend.last_seen))}
                           </Text>
                         </View>
                       </View>
@@ -428,8 +442,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   tabContainer: {
-    marginTop: 10,
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 8,
     paddingHorizontal: 8,
     zIndex: 0,
   },
@@ -476,17 +490,52 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
     fontWeight: 'bold',
   },
-  searchbar: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 16,
+  searchContainer: {
+    marginBottom: 12,
+    marginTop: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-    borderRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+    position: 'relative',
+    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+  },
+  searchShapeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderRadius: 16,
+    borderTopLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderWidth: 2,
+    borderColor: 'rgba(56, 189, 248, 0.8)',
+    zIndex: 1,
+  },
+  searchbar: {
+    backgroundColor: '#F8FAFC',
+    height: 42,
+    borderRadius: 14,
+    borderTopLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 8,
+    borderTopRightRadius: 8,
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    paddingHorizontal: 16,
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
+    zIndex: 2,
   },
   scrollContent: {
     paddingBottom: 100,
@@ -685,7 +734,7 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels, friendsCount, req
   const indicatorWidth = useSharedValue(0);
   
   // References to measure tab widths
-  const tabRefs = useRef<(React.RefObject<View>)[]>(tabs.map(() => React.createRef<View>()));
+  const tabRefs = useRef<(React.RefObject<View | null>)[]>(tabs.map(() => React.createRef<View | null>()));
   const tabWidths = useRef<number[]>(tabs.map(() => 0));
   const tabPositions = useRef<number[]>(tabs.map(() => 0));
   const isLayoutCalculated = useRef<boolean>(false);

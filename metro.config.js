@@ -16,6 +16,7 @@ config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 config.resolver.alias = {
   ...config.resolver.alias,
   'react-native-webrtc': 'react-native-webrtc/lib/index.js',
+  'event-target-shim': 'event-target-shim/dist/event-target-shim.js',
 };
 
 // Ensure proper asset resolution

@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
-import { Audio } from 'expo-av';
+import * as Audio from 'expo-audio';
+import Voice from '@react-native-voice/voice';
+import * as Speech from 'expo-speech';
 
 export interface VoiceSearchConfig {
   elevenLabsApiKey: string;
@@ -11,10 +13,17 @@ export class VoiceSearchService {
   private static isRecording = false;
   private static mediaRecorder: any;
   private static audioChunks: Blob[] = [];
-  private static recording: Audio.Recording | null = null;
+  private static recording: Audio.AudioRecorder | null = null;
+  private static lastTranscript: string = '';
+  private static audioUri: string | null = null;
 
   static configure(config: VoiceSearchConfig) {
     this.config = config;
+  }
+
+  // Check if currently recording
+  static isCurrentlyRecording(): boolean {
+    return this.isRecording;
   }
 
   // Start voice recording
@@ -69,53 +78,102 @@ export class VoiceSearchService {
   private static async stopWebRecording(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (!this.mediaRecorder || !this.isRecording) {
-        reject(new Error('No active recording'));
+        console.log('No active web recording to stop');
+        this.isRecording = false;
+        resolve('No active recording');
         return;
       }
 
       this.mediaRecorder.onstop = async () => {
         try {
+          // Check if we have any audio data
+          if (this.audioChunks.length === 0) {
+            console.log('No audio data captured');
+            this.isRecording = false;
+            resolve('No audio captured. Please try again.');
+            return;
+          }
+
           const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
           const transcript = await this.transcribeAudio(audioBlob);
           this.isRecording = false;
           
           // Stop all tracks to release microphone
-          this.mediaRecorder.stream.getTracks().forEach((track: any) => track.stop());
+          if (this.mediaRecorder.stream) {
+            this.mediaRecorder.stream.getTracks().forEach((track: any) => track.stop());
+          }
           
           resolve(transcript);
         } catch (error) {
-          reject(error);
+          console.error('Error in stopWebRecording:', error);
+          this.isRecording = false;
+          resolve('Failed to process recording. Please try again.');
         }
+      };
+
+      this.mediaRecorder.onerror = (error: any) => {
+        console.error('MediaRecorder error:', error);
+        this.isRecording = false;
+        resolve('Recording error. Please try again.');
       };
 
       this.mediaRecorder.stop();
     });
   }
 
-  // Native implementation using expo-av
+  // Native implementation using expo-av for recording and react-native-voice for STT
   private static async startNativeRecording(): Promise<void> {
     try {
-      // Request permissions
-      const { status } = await Audio.requestPermissionsAsync();
+      // Check if already recording
+      if (this.isRecording || this.recording) {
+        console.log('Recording already in progress, stopping previous recording');
+        await this.stopNativeRecording();
+      }
+
+      // Request permissions for audio recording
+      const { status } = await Audio.requestRecordingPermissionsAsync();
       if (status !== 'granted') {
         throw new Error('Microphone permission denied. Please enable microphone access in your device settings.');
       }
 
       // Configure audio mode
       await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
       // Create and start recording
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      const recording = new Audio.AudioRecorder(Audio.RecordingPresets.HIGH_QUALITY);
+      await recording.record();
       
       this.recording = recording;
       this.isRecording = true;
+
+      // Start speech recognition if supported
+      try {
+        const isVoiceAvailable = await Voice.isAvailable();
+        if (isVoiceAvailable) {
+          Voice.onSpeechResults = (e: any) => {
+            if (e.value && e.value.length > 0) {
+              this.lastTranscript = e.value[0];
+            }
+          };
+          Voice.onSpeechError = (e: any) => {
+            console.error('Speech recognition error:', e.error);
+            if (e.error && (e.error.code === '7' || e.error.code === '5')) {
+              this.lastTranscript = 'Speech recognition failed. Please try again.';
+            }
+          };
+          await Voice.start('en-US');
+        }
+      } catch (error) {
+        console.error('Error initializing speech recognition:', error);
+      }
     } catch (error: any) {
       console.error('Error starting native recording:', error);
+      // Clean up on error
+      this.isRecording = false;
+      this.recording = null;
       if (error.message && error.message.includes('permission')) {
         throw error; // Re-throw permission errors with original message
       }
@@ -126,24 +184,47 @@ export class VoiceSearchService {
   private static async stopNativeRecording(): Promise<string> {
     try {
       if (!this.recording || !this.isRecording) {
-        throw new Error('No active recording');
+        console.log('No active recording to stop');
+        this.isRecording = false;
+        this.recording = null;
+        return 'No active recording';
       }
 
-      await this.recording.stopAndUnloadAsync();
-      const uri = this.recording.getURI();
-      this.isRecording = false;
+      await this.recording.stop();
+      const uri = this.recording.uri;
       
       if (!uri) {
-        throw new Error('Failed to get recording URI');
+        console.warn('Failed to get recording URI');
+        return 'Recording completed but failed to get audio file';
       }
 
-      // For now, return a placeholder transcript
-      // In a real implementation, you would send the audio file to a speech-to-text service
-      return 'Voice recording completed. Speech-to-text not implemented for native platforms yet.';
+      this.audioUri = uri;
+
+      // Stop speech recognition if active - with improved error handling
+      try {
+        const isVoiceRecognizing = await Voice.isRecognizing();
+        if (isVoiceRecognizing) {
+          await Voice.stop();
+        }
+      } catch (error) {
+        console.warn('Speech recognition stop error (non-critical):', error);
+        // Don't treat this as a critical error - just log it
+        // Speech recognition might not be active or supported
+      }
+
+      // Return the transcript if available from speech recognition
+      if (this.lastTranscript) {
+        const transcript = this.lastTranscript;
+        this.lastTranscript = '';
+        return transcript;
+      }
+
+      return 'Voice recording completed. Speech-to-text not fully available.';
     } catch (error) {
       console.error('Error stopping native recording:', error);
-      throw new Error('Failed to stop recording.');
+      return 'Failed to stop recording';
     } finally {
+      this.isRecording = false;
       this.recording = null;
     }
   }
@@ -160,51 +241,25 @@ export class VoiceSearchService {
 
     // Fallback to ElevenLabs if configured
     if (this.config?.elevenLabsApiKey) {
-      return this.transcribeWithElevenLabs(audioBlob);
+      try {
+        return await this.transcribeWithElevenLabs(audioBlob);
+      } catch (error) {
+        console.warn('ElevenLabs transcription failed:', error);
+        return 'Voice message recorded. Transcription service temporarily unavailable.';
+      }
     }
 
-    throw new Error('No speech recognition service available. Please configure ElevenLabs API key for speech-to-text.');
+    // Return a user-friendly message instead of throwing an error
+    return 'Voice message recorded successfully. Transcription requires premium service configuration.';
   }
 
   // Web Speech API implementation (free, works offline)
+  // Note: Web Speech API can only transcribe live microphone input, not pre-recorded audio
   private static async transcribeWithWebSpeech(audioBlob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        reject(new Error('Speech recognition not supported'));
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        resolve(transcript);
-      };
-
-      recognition.onerror = (event: any) => {
-        reject(new Error(`Speech recognition error: ${event.error}`));
-      };
-
-      recognition.onend = () => {
-        // Recognition ended
-      };
-
-      // Convert blob to audio URL and play it for recognition
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new (window as any).Audio(audioUrl);
-      
-      recognition.start();
-      
-      // Clean up
-      setTimeout(() => {
-        URL.revokeObjectURL(audioUrl);
-      }, 1000);
-    });
+    console.warn('Web Speech API cannot transcribe pre-recorded audio blobs. Returning placeholder.');
+    // Web Speech API limitation: it can only work with live microphone input
+    // For pre-recorded audio transcription, we need a different service like ElevenLabs
+    return 'Voice message recorded successfully. Transcription requires premium service.';
   }
 
   // ElevenLabs implementation (premium, more accurate)
@@ -233,58 +288,12 @@ export class VoiceSearchService {
     }
   }
 
-  // Text-to-speech for voice feedback (using ElevenLabs)
+  // Text-to-speech for voice feedback
   static async speakText(text: string): Promise<void> {
-    if (!this.config?.elevenLabsApiKey) {
-      // Fallback to Web Speech API only on web platform
-      if (Platform.OS === 'web') {
-        return this.speakWithWebSpeech(text);
-      } else {
-        console.log('TTS:', text); // Just log on native platforms without ElevenLabs
-        return;
-      }
-    }
-
-    try {
-      const response = await fetch.call(globalThis, `https://api.elevenlabs.io/v1/text-to-speech/${this.config.voiceId || 'pNInz6obpgDQGcFmaJgB'}`, {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': this.config.elevenLabsApiKey,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`ElevenLabs TTS error: ${response.status}`);
-      }
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new (window as any).Audio(audioUrl);
-      
-      await audio.play();
-      
-      // Clean up
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-      };
-    } catch (error) {
-      console.error('ElevenLabs TTS error:', error);
-      // Fallback to Web Speech API only on web platform
-      if (Platform.OS === 'web') {
-        this.speakWithWebSpeech(text);
-      } else {
-        console.log('TTS fallback:', text);
-      }
+    if (Platform.OS === 'web') {
+      return this.speakWithWebSpeech(text);
+    } else {
+      return this.speakWithExpoSpeech(text);
     }
   }
 
@@ -301,7 +310,22 @@ export class VoiceSearchService {
     }
   }
 
-  static isCurrentlyRecording(): boolean {
-    return this.isRecording;
+  // Expo Speech TTS for native platforms
+  private static async speakWithExpoSpeech(text: string): Promise<void> {
+    try {
+      await Speech.speak(text, {
+        language: 'en-US',
+        pitch: 1.0,
+        rate: 0.8,
+      });
+    } catch (error) {
+      console.error('Expo Speech error:', error);
+      console.log('TTS fallback:', text);
+    }
+  }
+
+  // Get the URI of the last recorded audio for voice message feature
+  static getLastAudioUri(): string | null {
+    return this.audioUri;
   }
 }

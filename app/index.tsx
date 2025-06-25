@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -12,9 +12,12 @@ export default function IndexScreen() {
   const [hasSeenGuide, setHasSeenGuide] = useState<boolean | null>(null);
 
   useEffect(() => {
+    console.log('🚀 IndexScreen: Component mounted, starting initialization');
     const checkGuideStatus = async () => {
       try {
+        console.log('📖 IndexScreen: Checking guide status');
         const value = await AsyncStorage.getItem('hasSeenWelcomeGuide');
+        console.log('📖 IndexScreen: Guide status value:', value);
         setHasSeenGuide(value === 'true');
       } catch (err) {
         console.error('Error checking guide status:', err);
@@ -22,118 +25,88 @@ export default function IndexScreen() {
       }
     };
     checkGuideStatus();
+    console.log('🔐 IndexScreen: Starting auth initialization');
     initializeAuth();
-    setupNotifications();
+    // setupNotifications(); // Commented out - notifications feature not implemented yet
   }, []);
 
   useEffect(() => {
+    console.log('🧭 IndexScreen: Navigation effect triggered', {
+      hasSeenGuide,
+      isLoading,
+      isAuthenticated,
+      hasUser: !!user
+    });
+    
+    // Only navigate when both guide status and auth are loaded
     if (hasSeenGuide !== null && !isLoading) {
+      console.log('🧭 IndexScreen: Ready to navigate');
       // Add a small delay to ensure the Root Layout is fully mounted
       const timer = setTimeout(() => {
         if (!hasSeenGuide) {
+          console.log('🧭 IndexScreen: Navigating to welcome guide');
           router.replace('/welcome-guide');
         } else if (isAuthenticated) {
           if (user) {
             // User is authenticated and has a profile, go to main app
+            console.log('🧭 IndexScreen: Navigating to discover (authenticated with profile)');
             router.replace('/(tabs)/discover');
           } else {
             // User is authenticated but needs to complete onboarding
+            console.log('🧭 IndexScreen: Navigating to onboarding (authenticated without profile)');
             router.replace('/onboarding');
           }
         } else {
           // User is not authenticated, go to sign in
+          console.log('🧭 IndexScreen: Navigating to signin (not authenticated)');
           router.replace('/auth/signin');
         }
       }, 100);
 
       return () => clearTimeout(timer);
+    } else {
+      console.log('🧭 IndexScreen: Not ready to navigate yet');
     }
   }, [isAuthenticated, isLoading, user, hasSeenGuide]);
 
-  const setupNotifications = async () => {
-    try {
-      // Request notification permissions
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Notification permissions not granted');
-        return;
-      }
-
-      // Get push token - Note: For Android, FCM setup is required
-      let token;
-      try {
-        token = (await Notifications.getExpoPushTokenAsync({ projectId: 'your-project-id' })).data;
-        console.log('Push token:', token);
-      } catch (e) {
-        console.error('Error getting push token:', e);
-        console.log('For Android, ensure FCM is set up as per https://docs.expo.dev/push-notifications/fcm-credentials/');
-      }
-
-      // Save push token to user profile if user is authenticated and token is available
-      if (user?.id && token) {
-        const { error } = await supabase
-          .from('users')
-          .update({ push_token: token })
-          .eq('id', user.id);
-        if (error) {
-          console.error('Error saving push token:', error);
-        } else {
-          console.log('Push token saved to user profile');
-        }
-      }
-
-      // Set up notification handler
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-        }),
-      });
-
-      // Handle incoming notifications
-      const subscription = Notifications.addNotificationReceivedListener(notification => {
-        console.log('Notification received:', notification);
-        // Handle navigation or state update based on notification data
-      });
-
-      return () => subscription.remove();
-    } catch (error) {
-      console.error('Error setting up notifications:', error);
-    }
-  };
-
-  return (
-    <LinearGradient
-      colors={['#3B82F6', '#06B6D4']}
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <View style={{ alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="white" />
-        <Text style={{
-          color: 'white',
-          fontSize: 18,
-          marginTop: 20,
-          fontWeight: '600',
-        }}>
-          {error ? 'Error loading app...' : 'Loading RoleNet...'}
-        </Text>
-        {error && (
+  // Show loading screen while auth is initializing or guide status is unknown
+  if (isLoading || hasSeenGuide === null) {
+    return (
+      <LinearGradient
+        colors={['#3B82F6', '#06B6D4']}
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="white" />
           <Text style={{
-            color: 'rgba(255,255,255,0.8)',
-            fontSize: 14,
-            marginTop: 10,
-            textAlign: 'center',
-            paddingHorizontal: 40,
+            color: 'white',
+            fontSize: 18,
+            marginTop: 20,
+            fontWeight: '600',
           }}>
-            {error}
+            {error ? 'Error loading app...' : 'Initializing RoleNet...'}
           </Text>
-        )}
-      </View>
-    </LinearGradient>
-  );
+          {error && (
+            <Text style={{
+              color: 'rgba(255,255,255,0.8)',
+              fontSize: 14,
+              marginTop: 10,
+              textAlign: 'center',
+              paddingHorizontal: 20,
+            }}>
+              {error}
+            </Text>
+          )}
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // This component only handles navigation logic
+  // The loading UI is handled above
+  return null;
 }

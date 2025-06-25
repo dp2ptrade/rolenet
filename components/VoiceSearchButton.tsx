@@ -10,7 +10,7 @@ import Animated, {
   withSequence,
   Easing
 } from 'react-native-reanimated';
-import { Audio } from 'expo-av';
+import * as Audio from 'expo-audio';
 import { VoiceSearchService } from '@/lib/voiceSearch';
 
 interface VoiceSearchButtonProps {
@@ -75,7 +75,7 @@ export default function VoiceSearchButton({
     } else {
       // For native platforms, check expo-av permissions
       try {
-        const { status } = await Audio.requestPermissionsAsync();
+        const { status } = await Audio.requestRecordingPermissionsAsync();
         setHasPermission(status === 'granted');
       } catch (error) {
         console.error('Permission check error:', error);
@@ -127,7 +127,7 @@ export default function VoiceSearchButton({
             throw new Error('Microphone not available in this environment');
           }
         } else {
-          const { status } = await Audio.requestPermissionsAsync();
+          const { status } = await Audio.requestRecordingPermissionsAsync();
           if (status !== 'granted') {
             throw new Error('Microphone permission denied');
           }

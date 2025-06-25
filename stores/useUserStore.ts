@@ -46,23 +46,29 @@ export const useUserStore = create<UserStore>((set, get) => ({
   
   initializeAuth: async () => {
     try {
+      console.log('🔐 UserStore: Starting auth initialization');
       set({ isLoading: true, error: null });
       
       // Get current session
+      console.log('🔐 UserStore: Getting current session');
       const { session, error: sessionError } = await AuthService.getCurrentSession();
+      console.log('🔐 UserStore: Session result:', { hasSession: !!session, error: sessionError });
       
       if (sessionError) {
-        console.error('Session error:', sessionError);
-        set({ isAuthenticated: false, session: null });
+        console.error('🔐 UserStore: Session error:', sessionError);
+        set({ isAuthenticated: false, session: null, isLoading: false });
         return;
       }
       
       if (session?.user) {
+        console.log('🔐 UserStore: Session found, setting authenticated and loading profile');
         set({ session, isAuthenticated: true });
         
         // Load user profile
+        console.log('🔐 UserStore: Loading user profile for:', session.user.id);
         await get().loadUserProfile(session.user.id);
       } else {
+        console.log('🔐 UserStore: No session found, setting unauthenticated');
         set({ isAuthenticated: false, session: null });
       }
       
@@ -79,9 +85,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
       });
       
     } catch (error) {
-      console.error('Auth initialization error:', error);
+      console.error('🔐 UserStore: Auth initialization error:', error);
       set({ error: 'Failed to initialize authentication' });
     } finally {
+      console.log('🔐 UserStore: Auth initialization completed, setting isLoading to false');
       set({ isLoading: false });
     }
   },

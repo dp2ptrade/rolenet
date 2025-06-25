@@ -1,41 +1,41 @@
 import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform, ActivityIndicator } from 'react-native';
 import { Card, Text, Avatar, Button, Switch, List, Divider, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreditCard as Edit3, Settings, Star, MapPin, Phone, Mail, Tag, LogOut } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useUserStore } from '@/stores/useUserStore';
+import { useUserStore } from '../../stores/useUserStore';
+import { useStatusStore } from '../../stores/useStatusStore';
+import AnimatedStatusDot from '../../components/AnimatedStatusDot';
 import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user: currentUser, setCurrentUser, setAuthenticated, signOut } = useUserStore();
+  const { userStatuses, subscribeToUserStatuses, unsubscribeFromUserStatuses } = useStatusStore();
   const [isAvailable, setIsAvailable] = useState(currentUser?.is_available || false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  // Mock user data if no current user
-  const user = currentUser || {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    role: 'Software Engineer',
-    tags: ['Technology', 'Programming', 'Innovation'],
-    location: { latitude: 37.7749, longitude: -122.4194, address: 'San Francisco, CA' },
-    avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=400',
-    bio: 'Passionate software engineer with 5+ years of experience building scalable applications.',
-    online_status: 'online' as const,
-    is_available: true,
-    rating: 4.8,
-    rating_count: 32,
-    created_at: new Date(),
-    last_seen: new Date(),
-  };
+  React.useEffect(() => {
+    if (currentUser?.id) {
+      const currentChannels = userStatuses && Object.keys(userStatuses).length > 0;
+      if (!currentChannels || !userStatuses[currentUser.id]) {
+        subscribeToUserStatuses([currentUser.id]);
+      }
+    }
+    
+    return () => {
+      unsubscribeFromUserStatuses();
+    };
+  }, [currentUser?.id, userStatuses]);
 
   const handleEditProfile = () => {
     router.push('/edit-profile');
   };
 
   const handleViewProfile = () => {
-    router.push({ pathname: '/public-profile', params: { userId: user.id } });
+    if (currentUser) {
+      router.push({ pathname: '/public-profile', params: { userId: currentUser.id } });
+    }
   };
 
   const handleSettings = () => {
@@ -75,6 +75,25 @@ export default function ProfileScreen() {
     // TODO: Update user availability in store/API
   };
 
+  // Show loading while auth is initializing or user is not available
+  if (!currentUser) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={['#3B82F6', '#06B6D4']}
+          style={styles.loadingGradient}
+        >
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="white" />
+            <Text style={styles.loadingText}>Loading profile...</Text>
+          </View>
+        </LinearGradient>
+      </SafeAreaView>
+    );
+  }
+
+  const user = currentUser;
+
   const getRoleEmoji = (role: string) => {
     const roleEmojis: { [key: string]: string } = {
       'Software Engineer': '👨‍💻',
@@ -103,10 +122,11 @@ export default function ProfileScreen() {
                 size={80} 
                 source={{ uri: user.avatar || undefined }} 
               />
-              <View style={[
-                styles.statusDot,
-                { backgroundColor: user.online_status === 'online' ? '#10B981' : '#EF4444' }
-              ]} />
+              <AnimatedStatusDot
+                status={userStatuses[user.id]?.status || 'offline'}
+                size={12}
+                style={styles.statusDot}
+              />
             </View>
             
             <View style={styles.profileInfo}>
@@ -293,8 +313,8 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingTop: 8,
+    paddingBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -433,5 +453,19 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     marginTop: 8,
+  },
+  loadingGradient: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });

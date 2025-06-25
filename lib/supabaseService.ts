@@ -4,6 +4,9 @@ import { supabase } from './supabase';
 import { Session, AuthError } from '@supabase/supabase-js';
 import * as FileSystem from 'expo-file-system';
 import 'react-native-url-polyfill/auto';
+import { AppError, ERROR_CODES } from './errors';
+import { uploadTester } from './uploadTester';
+import { CONFIG } from './config/chatConfig';
 
 // Auth Service
 export class AuthService {
@@ -146,7 +149,7 @@ export class UserService {
     return { data, error };
   }
 
-  static async getNearbyUsers(latitude: number, longitude: number, radiusKm: number = 50) {
+  static async getNearbyUsers(latitude: number, longitude: number, radiusKm: number = CONFIG.SEARCH.DEFAULT_RADIUS_KM) {
     // Using PostGIS for location-based queries
     const { data, error } = await supabase.rpc('get_nearby_users', {
       user_lat: latitude,
@@ -391,11 +394,46 @@ export class ChatService {
       .insert({
         participants,
         unread_count: participants.reduce((acc, id) => ({ ...acc, [id]: 0 }), {}),
+        is_group: participants.length > 2,
       })
       .select()
       .single();
     
     return { data, error };
+  }
+
+  static async createGroupChat(name: string, participants: string[], createdBy: string) {
+    console.log('🏗️ Creating group chat:', { name, participants, createdBy });
+    
+    // Ensure the creator is included in participants if not already
+    const allParticipants = participants.includes(createdBy) ? participants : [...participants, createdBy];
+    console.log('👥 Final participants list:', allParticipants);
+    
+    const { data, error } = await supabase
+      .from('chats')
+      .insert({
+        name,
+        participants: allParticipants,
+        is_group: true,
+        created_by: createdBy,
+        unread_count: allParticipants.reduce((acc, id) => ({ ...acc, [id]: 0 }), {}),
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error creating group chat:', error);
+      return { data: null, error };
+    }
+    
+    console.log('✅ Group chat created successfully:', {
+      id: data.id,
+      name: data.name,
+      is_group: data.is_group,
+      created_by: data.created_by,
+      participants: data.participants
+    });
+    return { data, error: null };
   }
 
   static async uploadMedia(uri: string, bucket: string = 'chat-media'): Promise<string> {
@@ -450,13 +488,24 @@ export class ChatService {
           encoding: FileSystem.EncodingType.Base64,
         });
         
-        // Convert base64 to blob
+        console.log('📄 File info:', {
+          uri,
+          base64Length: base64.length,
+          fileExt
+        });
+        
+        // Convert base64 to blob - optimized for React Native
         const byteCharacters = atob(base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
           byteNumbers[i] = byteCharacters.charCodeAt(i);
         }
         const byteArray = new Uint8Array(byteNumbers);
+        
+        console.log('🔢 Byte array created:', {
+          length: byteArray.length,
+          type: typeof byteArray
+        });
         
         // Determine MIME type from file extension
         let mimeType = 'application/octet-stream';
@@ -465,19 +514,79 @@ export class ChatService {
         else if (fileExt === 'gif') mimeType = 'image/gif';
         else if (fileExt === 'webp') mimeType = 'image/webp';
         else if (fileExt === 'pdf') mimeType = 'application/pdf';
+        else if (fileExt === 'm4a' || fileExt === 'mp4') mimeType = 'audio/mp4';
+        else if (fileExt === 'wav') mimeType = 'audio/wav';
+        else if (fileExt === 'mp3') mimeType = 'audio/mpeg';
         
-        blob = new Blob([byteArray], { type: mimeType });
+        // Create blob with React Native compatible approach - avoid ArrayBuffer issues
+        try {
+          // Use base64 data URL approach first (most compatible with React Native)
+          const dataUrl = `data:${mimeType};base64,${base64}`;
+          const response = await fetch(dataUrl);
+          blob = await response.blob();
+          console.log('✅ Blob created with data URL approach');
+        } catch (dataUrlError) {
+          console.warn('Data URL approach failed, trying direct Uint8Array:', dataUrlError);
+          try {
+            // Fallback to direct Uint8Array
+            blob = new Blob([byteArray], { type: mimeType });
+            console.log('✅ Blob created with Uint8Array approach');
+          } catch (uint8Error) {
+            console.error('All blob creation methods failed, using FormData approach:', uint8Error);
+            // Last resort: create a FormData-compatible object
+            const formData = new FormData();
+            
+            // Create a File-like object from base64
+            const fileName = `upload.${fileExt}`;
+            const file = new File([base64], fileName, { type: mimeType });
+            
+            // For Supabase, we can upload the file directly
+            blob = file as any;
+            console.log('✅ Created File object as fallback');
+          }
+        }
       } else {
         console.log('🌐 Processing web URI...');
-        // Handle web URIs with fetch
-        const response = await fetch.call(globalThis, uri);
+        // Handle web URIs with fetch - add timeout and retry logic
+        let retries = 3;
+        let response: Response;
         
-        if (!response.ok) {
-          console.error('❌ Failed to fetch file:', response.status, response.statusText);
-          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        while (retries > 0) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), CONFIG.REALTIME.HEARTBEAT_INTERVAL);
+            
+            response = await fetch.call(globalThis, uri, {
+              signal: controller.signal,
+              headers: {
+                'Cache-Control': 'no-cache',
+              },
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            break; // Success, exit retry loop
+          } catch (error) {
+            retries--;
+            console.warn(`🔄 Fetch attempt failed, ${retries} retries left:`, error);
+            
+            if (retries === 0) {
+              if (error instanceof Error && error.name === 'AbortError') {
+                throw new Error('Network request timed out. Please check your internet connection and try again.');
+              }
+              throw new Error(`Failed to fetch file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+            
+            // Wait before retry (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, CONFIG.OFFLINE.BASE_RETRY_DELAY * Math.pow(CONFIG.OFFLINE.BACKOFF_MULTIPLIER, 4 - retries)));
+          }
         }
         
-        blob = await response.blob();
+        blob = await response!.blob();
       }
       console.log('✅ Blob created:', {
         size: blob.size,
@@ -490,29 +599,77 @@ export class ChatService {
         throw new Error('File size exceeds 10MB limit');
       }
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage with retry logic
       console.log('☁️ Uploading to Supabase Storage...');
       const uploadStartTime = Date.now();
       
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, blob, {
-          cacheControl: '3600',
-          upsert: false
-        });
+      let uploadRetries = 3;
+      let uploadData, uploadError;
+      
+      while (uploadRetries > 0) {
+        try {
+          const result = await supabase.storage
+            .from(bucket)
+            .upload(fileName, blob, {
+              cacheControl: '3600',
+              upsert: false
+            });
+          
+          uploadData = result.data;
+          uploadError = result.error;
+          
+          if (!uploadError) {
+            break; // Success, exit retry loop
+          }
+          
+          // If it's a network error, retry
+          if (uploadError.message.includes('Network') || uploadError.message.includes('timeout') || uploadError.message.includes('connection')) {
+            uploadRetries--;
+            if (uploadRetries > 0) {
+              console.warn(`🔄 Upload retry ${4 - uploadRetries}/3:`, uploadError.message);
+              await new Promise(resolve => setTimeout(resolve, CONFIG.OFFLINE.BASE_RETRY_DELAY * Math.pow(CONFIG.OFFLINE.BACKOFF_MULTIPLIER, 4 - uploadRetries)));
+              continue;
+            }
+          }
+          
+          // Non-retryable error, break out
+          break;
+        } catch (error) {
+          uploadRetries--;
+          uploadError = error;
+          if (uploadRetries > 0) {
+            console.warn(`🔄 Upload retry ${4 - uploadRetries}/3:`, error);
+            await new Promise(resolve => setTimeout(resolve, CONFIG.OFFLINE.BASE_RETRY_DELAY * Math.pow(CONFIG.OFFLINE.BACKOFF_MULTIPLIER, 4 - uploadRetries)));
+          }
+        }
+      }
 
       const uploadDuration = Date.now() - uploadStartTime;
       console.log(`⏱️ Upload took ${uploadDuration}ms`);
 
-      if (error) {
+      if (uploadError) {
         console.error('❌ Supabase upload error:', {
-          message: error.message,
-          error: error
+          message: uploadError instanceof Error ? uploadError.message : String(uploadError),
+          error: uploadError
         });
-        throw error;
+        
+        // Provide user-friendly error messages
+        const errorMessage = uploadError instanceof Error ? uploadError.message : 
+                           (uploadError && typeof uploadError === 'object' && 'message' in uploadError) ? 
+                           String((uploadError as any).message) : String(uploadError);
+        
+        if (errorMessage.includes('Network')) {
+          throw new Error('Upload failed due to network issues. Please check your internet connection and try again.');
+        } else if (errorMessage.includes('timeout')) {
+          throw new Error('Upload timed out. Please try again with a smaller file or better internet connection.');
+        } else if (errorMessage.includes('permission')) {
+          throw new Error('Permission denied. Please check your account permissions.');
+        }
+        
+        throw uploadError;
       }
 
-      console.log('✅ Upload successful:', data);
+      console.log('✅ Upload successful:', uploadData);
 
       // Get public URL
       console.log('🔗 Getting public URL...');
@@ -570,7 +727,7 @@ export class ChatService {
     return { data, error };
   }
 
-  static async getChatMessages(chatId: string, limit: number = 50) {
+  static async getChatMessages(chatId: string, limit: number = CONFIG.MESSAGES.DEFAULT_LIMIT) {
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -584,13 +741,36 @@ export class ChatService {
     return { data, error };
   }
 
-  static async getUserChats(userId: string, limit: number = 20) {
+  static async getUserChats(userId: string, limit: number = CONFIG.CHATS.DEFAULT_LIMIT) {
+    console.log('🔍 getUserChats called with userId:', userId, 'limit:', limit);
+    
+    // Try multiple query approaches to ensure we get all chats
     const { data, error } = await supabase
       .from('chats')
       .select('*')
-      .contains('participants', [userId])
+      .or(`participants.cs.{${userId}},created_by.eq.${userId}`)
       .order('updated_at', { ascending: false })
       .limit(limit);
+    
+    console.log('📊 getUserChats result:', {
+      dataCount: data?.length || 0,
+      error: error?.message || 'none',
+      groupChats: data?.filter(chat => chat.is_group)?.length || 0,
+      directChats: data?.filter(chat => !chat.is_group)?.length || 0,
+      createdByUser: data?.filter(chat => chat.created_by === userId)?.length || 0
+    });
+    
+    if (data) {
+      console.log('📋 Chat details:', data.map(chat => ({
+        id: chat.id,
+        name: chat.name,
+        is_group: chat.is_group,
+        created_by: chat.created_by,
+        participants: chat.participants,
+        isUserCreator: chat.created_by === userId,
+        isUserParticipant: chat.participants?.includes(userId)
+      })));
+    }
     
     return { data, error };
   }
@@ -661,6 +841,40 @@ export class ChatService {
     } catch (error) {
       console.error('ChatService: Unexpected error in deleteMessage:', error);
       return { data: null, error };
+    }
+  }
+
+  static async updateChatAvatar(chatId: string, avatarUri: string): Promise<{ data: any, error: any }> {
+    try {
+      // Upload the avatar to Supabase Storage
+      const publicUrl = await this.uploadMedia(avatarUri, 'chat-avatars');
+      
+      if (!publicUrl) {
+        throw new Error('Failed to upload avatar');
+      }
+
+      // Update the chat with the new avatar URL
+      const { data, error } = await supabase
+        .from('chats')
+        .update({ avatar_url: publicUrl })
+        .eq('id', chatId)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error updating chat avatar:', error);
+        return { data: null, error };
+      }
+      
+      console.log('Chat avatar updated successfully:', data);
+      return { data, error: null };
+    } catch (error) {
+      console.error('Unexpected error updating chat avatar:', error);
+      let errorMessage = 'Failed to update chat avatar due to an unexpected error.';
+      if (error instanceof Error && error.message.includes('Network request failed')) {
+        errorMessage = 'Failed to update chat avatar due to a network error. Please check your internet connection and try again.';
+      }
+      return { data: null, error: new Error(errorMessage) };
     }
   }
 }
@@ -823,6 +1037,205 @@ export class RealtimeService {
   }
 }
 
+export class GroupService {
+  // Get group members with user details
+  static async getGroupMembers(chatId: string) {
+    const { data, error } = await supabase
+      .from('group_members')
+      .select(`
+        *,
+        users:user_id (
+          id,
+          name,
+          email,
+          avatar,
+          online_status
+        )
+      `)
+      .eq('chat_id', chatId)
+      .eq('is_active', true)
+      .order('role', { ascending: false }) // admins first
+      .order('joined_at', { ascending: true });
+
+    return { data, error };
+  }
+
+  // Add member to group
+  static async addGroupMember(chatId: string, userId: string, role: 'admin' | 'moderator' | 'member' = 'member', invitedBy?: string) {
+    const { data, error } = await supabase
+      .from('group_members')
+      .insert({
+        chat_id: chatId,
+        user_id: userId,
+        role,
+        invited_by: invitedBy,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (!error) {
+      // Also add to chat participants
+      const { data: chat } = await supabase
+        .from('chats')
+        .select('participants')
+        .eq('id', chatId)
+        .single();
+
+      if (chat && !chat.participants.includes(userId)) {
+        await supabase
+          .from('chats')
+          .update({
+            participants: [...chat.participants, userId]
+          })
+          .eq('id', chatId);
+      }
+    }
+
+    return { data, error };
+  }
+
+  // Remove member from group
+  static async removeGroupMember(chatId: string, userId: string) {
+    const { data, error } = await supabase
+      .from('group_members')
+      .update({ is_active: false })
+      .eq('chat_id', chatId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (!error) {
+      // Also remove from chat participants
+      const { data: chat } = await supabase
+        .from('chats')
+        .select('participants')
+        .eq('id', chatId)
+        .single();
+
+      if (chat) {
+        await supabase
+          .from('chats')
+          .update({
+            participants: chat.participants.filter((id: string) => id !== userId)
+          })
+          .eq('id', chatId);
+      }
+    }
+
+    return { data, error };
+  }
+
+  // Update member role
+  static async updateMemberRole(chatId: string, userId: string, role: 'admin' | 'moderator' | 'member') {
+    const { data, error } = await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('chat_id', chatId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
+  // Get group settings
+  static async getGroupSettings(chatId: string) {
+    const { data, error } = await supabase
+      .from('group_settings')
+      .select('*')
+      .eq('chat_id', chatId)
+      .single();
+
+    return { data, error };
+  }
+
+  // Update group settings
+  static async updateGroupSettings(chatId: string, settings: Partial<{
+    description: string;
+    max_members: number;
+    allow_member_invite: boolean;
+    allow_member_add_others: boolean;
+    message_history_visible: boolean;
+    only_admins_can_send: boolean;
+    approval_required_to_join: boolean;
+    allow_media_sharing: boolean;
+    allow_voice_messages: boolean;
+    allow_file_sharing: boolean;
+    auto_delete_messages_days: number | null;
+    welcome_message: string;
+    group_rules: string;
+  }>) {
+    const { data, error } = await supabase
+      .from('group_settings')
+      .update(settings)
+      .eq('chat_id', chatId)
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
+  // Check if user is admin or moderator
+  static async getUserRole(chatId: string, userId: string) {
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('chat_id', chatId)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .single();
+
+    return { data: data?.role || 'member', error };
+  }
+
+  // Check if user has permission to perform action
+  static async hasPermission(chatId: string, userId: string, action: 'manage_members' | 'manage_settings' | 'delete_messages' | 'pin_messages') {
+    const { data: role } = await this.getUserRole(chatId, userId);
+    
+    switch (action) {
+      case 'manage_members':
+      case 'manage_settings':
+        return role === 'admin';
+      case 'delete_messages':
+      case 'pin_messages':
+        return role === 'admin' || role === 'moderator';
+      default:
+        return false;
+    }
+  }
+
+  // Leave group (for current user)
+  static async leaveGroup(chatId: string, userId: string) {
+    // Check if user is the only admin
+    const { data: members } = await supabase
+      .from('group_members')
+      .select('user_id, role')
+      .eq('chat_id', chatId)
+      .eq('is_active', true);
+
+    const admins = members?.filter(m => m.role === 'admin') || [];
+    const isOnlyAdmin = admins.length === 1 && admins[0].user_id === userId;
+
+    if (isOnlyAdmin) {
+      // Transfer admin to another member or delete group if no other members
+      const otherMembers = members?.filter(m => m.user_id !== userId) || [];
+      
+      if (otherMembers.length > 0) {
+        // Promote the oldest member to admin
+        await this.updateMemberRole(chatId, otherMembers[0].user_id, 'admin');
+      } else {
+        // Delete the group if no other members
+        await supabase.from('chats').delete().eq('id', chatId);
+        return { data: { deleted: true }, error: null };
+      }
+    }
+
+    // Remove user from group
+    return await this.removeGroupMember(chatId, userId);
+  }
+}
+
 // Service instances for easier importing
 export const authService = AuthService;
 export const userService = UserService;
@@ -832,3 +1245,4 @@ export const callService = CallService;
 export const chatService = ChatService;
 export const ratingService = RatingService;
 export const realtimeService = RealtimeService;
+export const groupService = GroupService;

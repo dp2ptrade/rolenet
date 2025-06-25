@@ -1,19 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { initializeDebugging } from '../debug.config';
+import React, { useEffect, useState } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initializeDebugging } from '../debug.config.js';
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { PaperProvider, MD3LightTheme } from 'react-native-paper';
+import { PaperProvider, DefaultTheme } from 'react-native-paper';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import { useCallStore } from '../stores/useCallStore';
 import { useUserStore } from '../stores/useUserStore';
+import { useAppStateStore } from '../stores/useAppStateStore';
 import IncomingCallModal from '../components/IncomingCallModal';
 import { UserService } from '../lib/supabaseService';
 
 const theme = {
-  ...MD3LightTheme,
+  ...DefaultTheme,
   colors: {
-    ...MD3LightTheme.colors,
+    ...DefaultTheme.colors,
     primary: '#3B82F6',
     primaryContainer: '#EFF6FF',
     secondary: '#06B6D4',
@@ -39,6 +41,12 @@ export default function RootLayout() {
   useFrameworkReady();
   
   const currentUser = useUserStore((state: any) => state.user);
+  const initializeAuth = useUserStore((state: any) => state.initializeAuth);
+  
+  // Initialize authentication on app load
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
   const {
     incomingCall,
     callStatus,
@@ -47,6 +55,14 @@ export default function RootLayout() {
     initializeWebRTC
   } = useCallStore();
   
+  const { 
+    initializeAppStateMonitoring, 
+    handleAppWakeFromCall,
+    ensureWebRTCSubscription,
+    callNotificationReceived,
+    isInCallBackground 
+  } = useAppStateStore();
+  const { handleForegroundCall, handleBackgroundCall } = useCallStore();
   const [callerInfo, setCallerInfo] = useState<any>(null);
   
   // Initialize WebRTC when user is available
@@ -56,14 +72,73 @@ export default function RootLayout() {
     }
   }, [currentUser?.id, initializeWebRTC]);
   
+  // Initialize app state monitoring
+  useEffect(() => {
+    const cleanup = initializeAppStateMonitoring();
+    return cleanup;
+  }, [initializeAppStateMonitoring]);
+  
+  // Handle app state changes for calls
+  useEffect(() => {
+    const { AppState } = require('react-native');
+    
+    const handleAppStateChange = (nextAppState: string) => {
+      console.log('📱 [Layout] App state changed:', {
+        nextAppState,
+        hasIncomingCall: !!incomingCall,
+        isInCall: !!callStatus && callStatus !== 'idle',
+        callNotificationReceived,
+        isInCallBackground
+      });
+      
+      if (nextAppState === 'active') {
+        // App came to foreground
+        if (callNotificationReceived) {
+          console.log('📞 [Layout] Handling app wake from call notification');
+          handleAppWakeFromCall();
+        }
+        
+        // Handle call return to foreground
+        if (incomingCall || (callStatus && callStatus !== 'idle')) {
+          handleForegroundCall();
+        }
+        
+        // Ensure WebRTC subscription is active
+        ensureWebRTCSubscription();
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App went to background
+        if (incomingCall || (callStatus && callStatus !== 'idle')) {
+          console.log('📞 [Layout] Call active when going to background');
+          handleBackgroundCall();
+        }
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    return () => {
+      subscription?.remove();
+    };
+  }, [incomingCall, callStatus, callNotificationReceived, isInCallBackground, handleAppWakeFromCall, ensureWebRTCSubscription, handleForegroundCall, handleBackgroundCall]);
+  
   // Load caller info when incoming call is received
   useEffect(() => {
+    console.log('📱 [Layout] Incoming call effect triggered:', {
+      incomingCall: incomingCall ? {
+        id: incomingCall.id,
+        caller_id: incomingCall.caller_id,
+        status: incomingCall.status
+      } : null,
+      callStatus,
+      timestamp: new Date().toISOString()
+    });
+    
     if (incomingCall?.caller_id) {
       loadCallerInfo(incomingCall.caller_id);
     } else {
       setCallerInfo(null);
     }
-  }, [incomingCall]);
+  }, [incomingCall, callStatus]);
   
   const loadCallerInfo = async (callerId: string) => {
     try {
@@ -78,9 +153,28 @@ export default function RootLayout() {
   const handleAcceptCall = async () => {
     if (incomingCall?.id) {
       try {
+        console.log('✅ [Layout] Accepting call:', incomingCall.id);
         await acceptCall(incomingCall.id);
+        
+        // Navigate to call screen with error handling
+        try {
+          const router = require('expo-router').router;
+          console.log('🧭 [Layout] Navigating to call screen');
+          router.push(`/call?callId=${incomingCall.id}&type=incoming`);
+        } catch (navError) {
+          console.error('❌ [Layout] Navigation failed:', navError);
+          // Fallback: try alternative navigation
+          setTimeout(() => {
+            try {
+              const router = require('expo-router').router;
+              router.replace(`/call?callId=${incomingCall.id}&type=incoming`);
+            } catch (fallbackError) {
+              console.error('❌ [Layout] Fallback navigation failed:', fallbackError);
+            }
+          }, 100);
+        }
       } catch (error) {
-        console.error('Failed to accept call:', error);
+        console.error('❌ [Layout] Failed to accept call:', error);
       }
     }
   };
@@ -88,36 +182,57 @@ export default function RootLayout() {
   const handleDeclineCall = async () => {
     if (incomingCall?.id) {
       try {
+        console.log('❌ [Layout] Declining call:', incomingCall.id);
         await declineCall(incomingCall.id);
       } catch (error) {
-        console.error('Failed to decline call:', error);
+        console.error('❌ [Layout] Failed to decline call:', error);
       }
     }
   };
 
   return (
-    <PaperProvider theme={theme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="auth/signin" />
-        <Stack.Screen name="auth/signup" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      
-      {/* Global Incoming Call Modal */}
-      <IncomingCallModal
-        visible={!!incomingCall && callStatus === 'ringing'}
-        callerName={callerInfo?.name || callerInfo?.full_name}
-        callerAvatar={callerInfo?.avatar_url}
-        callerRole={callerInfo?.role}
-        callId={incomingCall?.id}
-        onAccept={handleAcceptCall}
-        onDecline={handleDeclineCall}
-      />
-      
-      <StatusBar style="auto" />
-    </PaperProvider>
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="auth/signin" />
+          <Stack.Screen name="auth/signup" />
+          <Stack.Screen name="onboarding" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        
+        {/* Global Incoming Call Modal */}
+        {(() => {
+          const shouldShowModal = !!incomingCall && callStatus === 'ringing';
+          console.log('🎭 [Layout] Modal visibility check:', {
+            shouldShowModal,
+            hasIncomingCall: !!incomingCall,
+            callStatus,
+            incomingCallId: incomingCall?.id,
+            callerInfo: callerInfo ? {
+              name: callerInfo.name || callerInfo.full_name,
+              hasAvatar: !!callerInfo.avatar_url
+            } : null,
+            timestamp: new Date().toISOString()
+          });
+          
+          return (
+            <IncomingCallModal
+              visible={shouldShowModal}
+              callerName={callerInfo?.name || callerInfo?.full_name}
+              callerAvatar={callerInfo?.avatar_url}
+              callerRole={callerInfo?.role}
+              callId={incomingCall?.id}
+              onAccept={handleAcceptCall}
+              onDecline={handleDeclineCall}
+            />
+          );
+        })()}
+        
+        <StatusBar style="auto" translucent />
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }

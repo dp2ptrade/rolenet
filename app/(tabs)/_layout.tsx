@@ -1,8 +1,10 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { Search, Activity, Users, User, Bell, MessageCircle } from 'lucide-react-native';
+import { Search, Activity, Users, User, Bell, MessageCircle, Phone } from 'lucide-react-native';
 import { useTheme, Badge } from 'react-native-paper';
 import { useNotificationStore } from '@/stores/useNotificationStore';
 import { useChatStore } from '@/stores/useChatStore';
+import { useCallStore } from '@/stores/useCallStore';
 import { getPlatformStyles, isWeb } from '@/utils/platform';
 
 export default function TabLayout() {
@@ -80,6 +82,37 @@ export default function TabLayout() {
                     }}
                   >
                     {unreadChatsCount > 99 ? '99+' : unreadChatsCount}
+                  </Badge>
+                )}
+              </>
+            );
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="calls"
+        options={{
+          title: 'Calls',
+          tabBarIcon: ({ size, color }) => {
+            const { isInCall, missedCallsCount } = useCallStore();
+            return (
+              <>
+                <Phone size={size} color={isInCall ? theme.colors.primary : color} strokeWidth={2.5} />
+                {missedCallsCount > 0 && (
+                  <Badge
+                    style={{
+                      position: 'absolute',
+                      top: -5,
+                      right: -10,
+                      backgroundColor: theme.colors.error,
+                      color: 'white',
+                      fontSize: 10,
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                    }}
+                  >
+                    {missedCallsCount > 99 ? '99+' : missedCallsCount}
                   </Badge>
                 )}
               </>

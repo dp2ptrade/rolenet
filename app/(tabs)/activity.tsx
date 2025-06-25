@@ -758,7 +758,7 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels, pendingCount }: T
   const indicatorWidth = useSharedValue(0);
   
   // References to measure tab widths
-  const tabRefs = useRef<(React.RefObject<View>)[]>(tabs.map(() => React.createRef<View>()));
+  const tabRefs = useRef<React.RefObject<View | null>[]>(tabs.map(() => React.createRef<View>()));
   const tabWidths = useRef<number[]>(tabs.map(() => 0));
   const tabPositions = useRef<number[]>(tabs.map(() => 0));
   const isLayoutCalculated = useRef<boolean>(false);

@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { Appbar } from 'react-native-paper';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { useUserStore } from '@/stores/useUserStore';
+import { useStatusStore } from '@/stores/useStatusStore';
 
 export default function PublicProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -16,9 +17,14 @@ export default function PublicProfileScreen() {
   const [loading, setLoading] = useState(true);
   const { user: currentUser } = useUserStore();
   const { sendFriendRequest, unfriend } = useFriendStore();
+  const { subscribeToUserStatuses, unsubscribeFromUserStatuses } = useStatusStore();
 
   useEffect(() => {
     if (!userId) return;
+    
+    // Subscribe to status updates for this user immediately
+    subscribeToUserStatuses([userId]);
+    
     UserService.getUserProfile(userId as string)
       .then(({ data, error }) => {
         if (error) {
@@ -28,6 +34,10 @@ export default function PublicProfileScreen() {
         }
       })
       .finally(() => setLoading(false));
+      
+    return () => {
+      unsubscribeFromUserStatuses();
+    };
   }, [userId]);
 
   const handleSendFriendRequest = async (userId: string) => {

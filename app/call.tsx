@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Card, Button, Avatar, Surface, IconButton, ProgressBar } from 'react-native-paper';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Text, Card, Avatar, IconButton, ProgressBar } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useUserStore } from '../stores/useUserStore';
 import { useCallStore } from '../stores/useCallStore';
+import { COLORS } from '../constants/theme';
 
 export default function CallScreen() {
   const { userId, userName, userRole, userAvatar, pingId, callId, isIncoming } = useLocalSearchParams();
@@ -65,7 +65,7 @@ export default function CallScreen() {
 
   useEffect(() => {
     // Call duration timer and quality simulation
-    let interval: NodeJS.Timeout;
+    let interval: number;
     if (callStatus === 'connected' && isInCall) {
       interval = setInterval(() => {
         setCallDuration(prev => prev + 1);
@@ -97,20 +97,24 @@ export default function CallScreen() {
   };
 
   const handleEndCall = () => {
-    Alert.alert(
-      'End Call',
-      'Are you sure you want to end this call?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Call',
-          style: 'destructive',
-          onPress: async () => {
-            await endCall();
+    if (Platform.OS === 'web') {
+      endCall();
+    } else {
+      Alert.alert(
+        'End Call',
+        'Are you sure you want to end this call?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'End Call',
+            style: 'destructive',
+            onPress: async () => {
+              await endCall();
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    }
   };
 
   const handleAcceptCall = async () => {
@@ -187,54 +191,23 @@ export default function CallScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#1F2937', '#374151']}
-        style={styles.background}
-      >
+      <View style={styles.background}>
         <View style={styles.content}>
           {/* User Info */}
           <View style={styles.userSection}>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <Avatar.Image
-                size={120}
-                source={userAvatar ? { uri: userAvatar as string } : require('../assets/images/rolenet-logo.png')}
-                style={styles.avatar}
-              />
-            </Animated.View>
             <Text variant="headlineMedium" style={styles.userName}>
               {userName}
             </Text>
-            <Text variant="bodyLarge" style={styles.userRole}>
-              {userRole}
+            <Text variant="bodyLarge" style={styles.callStatus}>
+              {getStatusText()}
             </Text>
-            
-            {/* Call Status */}
-            <Surface style={styles.statusChip} elevation={2}>
-              <Text variant="bodyMedium" style={styles.statusText}>
-                {getStatusText()}
-              </Text>
-            </Surface>
-            
-            {/* Call Quality Indicator */}
-            {callStatus === 'connected' && (
-              <View style={styles.qualityContainer}>
-                <ProgressBar 
-                  progress={callQuality} 
-                  color={callQuality >= 0.7 ? '#10B981' : callQuality >= 0.5 ? '#F59E0B' : '#EF4444'} 
-                  style={styles.qualityBar}
-                />
-                <Text variant="bodySmall" style={styles.qualityText}>
-                  Call Quality: {getCallQualityText()}
-                </Text>
-              </View>
-            )}
-            
-            {/* Connection State Debug Info */}
-            {__DEV__ && (
-              <Text variant="bodySmall" style={styles.debugText}>
-                Connection: {connectionState}
-              </Text>
-            )}
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Avatar.Image
+                size={200}
+                source={userAvatar ? { uri: userAvatar as string } : { uri: 'https://via.placeholder.com/200' }}
+                style={styles.avatar}
+              />
+            </Animated.View>
           </View>
 
           {/* Call Controls */}
@@ -244,18 +217,18 @@ export default function CallScreen() {
               <View style={styles.incomingControlsRow}>
                 <IconButton
                   icon="phone-hangup"
-                  size={35}
+                  size={60}
                   iconColor="white"
-                  containerColor="#ef4444"
+                  containerColor="#ff3b30"
                   onPress={handleDeclineCall}
                   style={[styles.controlButton, styles.declineButton]}
                   disabled={isLoading}
                 />
                 <IconButton
                   icon="phone"
-                  size={35}
+                  size={60}
                   iconColor="white"
-                  containerColor="#22c55e"
+                  containerColor="#34c759"
                   onPress={handleAcceptCall}
                   style={[styles.controlButton, styles.acceptButton]}
                   disabled={isLoading}
@@ -264,34 +237,29 @@ export default function CallScreen() {
             ) : (
               // Active call controls
               <View style={styles.controls}>
-                {/* Mute Button */}
                 <IconButton
                   icon={isMuted ? "microphone-off" : "microphone"}
-                  size={32}
+                  size={40}
                   iconColor="white"
-                  containerColor={isMuted ? "#ef4444" : "rgba(255, 255, 255, 0.2)"}
+                  containerColor={isMuted ? "#ff3b30" : "rgba(255, 255, 255, 0.3)"}
                   onPress={handleMute}
                   style={styles.controlButton}
                   disabled={!isInCall}
                 />
-                
-                {/* End Call Button */}
                 <IconButton
                   icon="phone-hangup"
-                  size={40}
+                  size={60}
                   iconColor="white"
-                  containerColor="#EF4444"
+                  containerColor="#ff3b30"
                   onPress={handleEndCall}
                   style={[styles.controlButton, styles.endCallButton]}
                   disabled={isLoading}
                 />
-                
-                {/* Speaker Button */}
                 <IconButton
                   icon={isSpeakerOn ? "volume-high" : "volume-medium"}
-                  size={32}
+                  size={40}
                   iconColor="white"
-                  containerColor={isSpeakerOn ? "#3b82f6" : "rgba(255, 255, 255, 0.2)"}
+                  containerColor={isSpeakerOn ? "#007aff" : "rgba(255, 255, 255, 0.3)"}
                   onPress={handleSpeaker}
                   style={styles.controlButton}
                   disabled={!isInCall}
@@ -300,6 +268,20 @@ export default function CallScreen() {
             )}
           </View>
 
+          {/* Call Quality Indicator */}
+          {callStatus === 'connected' && (
+            <View style={styles.qualityContainer}>
+              <ProgressBar 
+                progress={callQuality} 
+                color={callQuality >= 0.7 ? '#34c759' : callQuality >= 0.5 ? '#ffcc00' : '#ff3b30'} 
+                style={styles.qualityBar}
+              />
+              <Text variant="bodySmall" style={styles.qualityText}>
+                Call Quality: {getCallQualityText()}
+              </Text>
+            </View>
+          )}
+
           {/* Ping Context */}
           {pingId && (
             <Card style={styles.pingCard}>
@@ -307,14 +289,14 @@ export default function CallScreen() {
                 <Text variant="bodySmall" style={styles.pingLabel}>
                   Started from ping
                 </Text>
-                <Text variant="bodyMedium">
+                <Text variant="bodyMedium" style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 14 }}>
                   This call was initiated in response to a ping from {userName}
                 </Text>
               </Card.Content>
             </Card>
           )}
         </View>
-      </LinearGradient>
+      </View>
     </SafeAreaView>
   );
 }
@@ -322,101 +304,104 @@ export default function CallScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   background: {
     flex: 1,
+    backgroundColor: '#121212',
   },
   content: {
     flex: 1,
     justifyContent: 'space-between',
-    padding: 24,
+    padding: 20,
   },
   userSection: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 60,
-  },
-  avatar: {
-    marginBottom: 24,
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    marginTop: 40,
   },
   userName: {
-    color: 'white',
+    color: '#FFFFFF',
     fontWeight: 'bold',
+    fontSize: 28,
     marginBottom: 8,
     textAlign: 'center',
   },
-  userRole: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 16,
+  callStatus: {
+    color: '#AAAAAA',
+    fontSize: 16,
+    marginBottom: 20,
     textAlign: 'center',
   },
-  statusChip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  qualityContainer: {
-    width: '60%',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  qualityBar: {
-    height: 6,
-    width: '100%',
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginBottom: 8,
-  },
-  qualityText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-  },
-  statusText: {
-    color: 'white',
-    fontWeight: '600',
+  avatar: {
+    borderWidth: 6,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#333',
+    marginTop: 20,
   },
   controlsSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   controls: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    gap: 32,
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   incomingControlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     width: '100%',
-    maxWidth: 200,
+    paddingHorizontal: 40,
+    paddingVertical: 20,
   },
   controlButton: {
-    elevation: 4,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   endCallButton: {
-    transform: [{ scale: 1.2 }],
+    backgroundColor: 'rgba(255, 59, 48, 0.3)',
   },
   acceptButton: {
-    transform: [{ scale: 1.2 }],
+    backgroundColor: 'rgba(52, 199, 89, 0.3)',
   },
   declineButton: {
-    transform: [{ scale: 1.2 }],
+    backgroundColor: 'rgba(255, 59, 48, 0.3)',
   },
-  debugText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: 8,
-    textAlign: 'center',
+  qualityContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+    padding: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 10,
+  },
+  qualityBar: {
+    height: 8,
+    width: 200,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginBottom: 8,
+  },
+  qualityText: {
+    color: '#AAAAAA',
+    fontSize: 12,
   },
   pingCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 20,
+    borderRadius: 10,
+    borderWidth: 0,
   },
   pingLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 4,
+    color: '#AAAAAA',
+    marginBottom: 5,
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
 });

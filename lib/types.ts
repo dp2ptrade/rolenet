@@ -53,11 +53,28 @@ export interface Call {
   duration?: number;
   created_at: Date;
   ended_at?: Date;
+  caller?: {
+    id: string;
+    name: string;
+    avatar?: string;
+    role?: string;
+  };
+  callee?: {
+    id: string;
+    name: string;
+    avatar?: string;
+    role?: string;
+  };
 }
 
 export interface Chat {
   id: string;
   participants: string[];
+  name?: string; // Group name for group chats
+  unique_link?: string; // Unique invite link for groups
+  is_group?: boolean; // Whether this is a group chat
+  created_by?: string; // User ID who created the group
+  avatar_url?: string; // Group avatar URL
   last_message?: string;
   last_message_time?: Date;
   unread_count?: number;
@@ -72,10 +89,13 @@ export interface Message {
   senderId: string;
   text?: string;
   mediaUrl?: string;
-  type: 'text' | 'image' | 'audio';
-  status: 'sent' | 'delivered' | 'read';
+  mediaUri?: string;
+  type: 'text' | 'image' | 'audio' | 'voice' | 'document' | 'location';
+  status: 'sent' | 'delivered' | 'read' | 'pending' | 'failed';
   timestamp: Date;
+  tempId?: string;
   isPinned?: boolean;
+  reactions?: { [key: string]: string[] };
 }
 
 export interface Rating {
@@ -99,6 +119,39 @@ export interface Notification {
   read_at?: string;
   status: 'sent' | 'delivered' | 'failed';
   created_at: string;
+}
+
+export interface GroupMember {
+  id: string;
+  chat_id: string;
+  user_id: string;
+  role: 'admin' | 'moderator' | 'member';
+  joined_at: Date;
+  invited_by?: string;
+  permissions?: Record<string, any>; // Custom permissions for moderators
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface GroupSettings {
+  id: string;
+  chat_id: string;
+  description?: string;
+  max_members: number;
+  allow_member_invite: boolean;
+  allow_member_add_others: boolean;
+  message_history_visible: boolean;
+  only_admins_can_send: boolean;
+  approval_required_to_join: boolean;
+  allow_media_sharing: boolean;
+  allow_voice_messages: boolean;
+  allow_file_sharing: boolean;
+  auto_delete_messages_days?: number;
+  welcome_message?: string;
+  group_rules?: string;
+  created_at: Date;
+  updated_at: Date;
 }
 
 export const POPULAR_ROLES = [

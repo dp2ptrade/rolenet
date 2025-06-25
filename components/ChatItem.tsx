@@ -13,13 +13,14 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
   const { friends } = useFriendStore();
 
   const handleChatPress = () => {
-    const isGroup = chat.participants.length > 2;
+    const isGroup = chat.is_group || chat.participants.length > 2;
     if (isGroup) {
+      const groupName = chat.name || `Group Chat (${chat.participants.length})`;
       router.push({
         pathname: '/groupChat',
         params: {
           chatId: chat.id,
-          chatName: `Group Chat (${chat.participants.length})`,
+          chatName: groupName,
           isGroup: 'true',
           participants: JSON.stringify(chat.participants)
         }
@@ -47,7 +48,12 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
   };
 
   const getChatAvatar = () => {
-    if (chat.participants.length > 2) {
+    const isGroup = chat.is_group || chat.participants.length > 2;
+    if (isGroup) {
+      // Show group avatar if available, otherwise show group icon
+      if (chat.avatar_url) {
+        return <Avatar.Image size={50} source={{ uri: chat.avatar_url }} />;
+      }
       return <Avatar.Icon size={50} icon={({ size, color }) => <Users size={size} color={color} />} />;
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
@@ -63,8 +69,9 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
   };
 
   const getChatName = () => {
-    if (chat.participants.length > 2) {
-      return `Group Chat (${chat.participants.length})`;
+    const isGroup = chat.is_group || chat.participants.length > 2;
+    if (isGroup) {
+      return chat.name || `Group Chat (${chat.participants.length})`;
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
       const otherUser = friends.find(f => f.id === otherUserId);
@@ -73,7 +80,8 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
   };
 
   const getChatSubtitle = () => {
-    if (chat.participants.length > 2) {
+    const isGroup = chat.is_group || chat.participants.length > 2;
+    if (isGroup) {
       return `${chat.participants.length} members • ${chat.last_message || 'No messages yet'}`;
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);

@@ -3,9 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "typeRoots": ["./types"],
     "paths": {
       "@/*": ["./*"]
     }
@@ -16,5 +17,8 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts"
+  ],
+  "exclude": [
+    "supabase/functions/**/*"
   ]
 }

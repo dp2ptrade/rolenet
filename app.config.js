@@ -16,6 +16,7 @@ export default {
       associatedDomains: ["applinks:rolenet.site"]
     },
     android: {
+      edgeToEdgeEnabled: true,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -53,6 +54,7 @@ export default {
     },
     plugins: [
       "expo-router",
+      "expo-web-browser",
       "expo-font",
       "expo-location",
       "expo-notifications",
@@ -66,6 +68,12 @@ export default {
     extra: {
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_TURN_SERVER_URL: process.env.EXPO_PUBLIC_TURN_SERVER_URL,
+      EXPO_PUBLIC_TURN_SERVER_USERNAME: process.env.EXPO_PUBLIC_TURN_SERVER_USERNAME,
+      EXPO_PUBLIC_TURN_SERVER_CREDENTIAL: process.env.EXPO_PUBLIC_TURN_SERVER_CREDENTIAL,
+      EXPO_PUBLIC_BACKUP_TURN_SERVER_URL: process.env.EXPO_PUBLIC_BACKUP_TURN_SERVER_URL,
+      EXPO_PUBLIC_BACKUP_TURN_SERVER_USERNAME: process.env.EXPO_PUBLIC_BACKUP_TURN_SERVER_USERNAME,
+      EXPO_PUBLIC_BACKUP_TURN_SERVER_CREDENTIAL: process.env.EXPO_PUBLIC_BACKUP_TURN_SERVER_CREDENTIAL,
       eas: {
         projectId: "e94b7ba1-6bd3-4965-89eb-b70b4eae8127"
       }
