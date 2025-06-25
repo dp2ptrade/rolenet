@@ -1,9 +1,12 @@
 import { create } from 'zustand';
-import { chatService } from '../lib/supabaseService';
+import { supabase } from '../lib/supabase';
 import { offlineStorage } from '../lib/offlineStorage';
 import { chatPagination } from '../lib/chatPagination';
+import { CONFIG } from '../lib/config/chatConfig';
+import { realtimeManager } from '../lib/realtimeManager';
+import { chatDataManager, messageDataManager } from '../lib/dataLoadingManager';
+import { chatService } from '../lib/supabaseService';
 import NetInfo from '@react-native-community/netinfo';
-import { CONFIG } from '../lib/config/chatConfig';'../lib/networkUtils';
 import { Chat, Message } from '../lib/types';
 
 interface OfflineMessage {
@@ -73,6 +76,13 @@ interface ChatState {
   syncOfflineMessages: () => Promise<void>;
   queueOfflineMessage: (message: Omit<OfflineMessage, 'id' | 'retryCount' | 'status'>) => Promise<void>;
   loadCachedData: (userId: string) => Promise<void>;
+  
+  // Performance monitoring
+  getPerformanceStats: () => {
+    subscriptions: number;
+    cacheSize: number;
+    memoryUsage: number;
+  };
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -277,8 +287,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     
     try {
       const offset = chats.length;
-      const result = await chatService.getUserChats(userId);
-      const { data, error } = result;
+      const { data, error } = await supabase
+        .from('chats')
+        .select('*')
+        .range(get().chats.length, get().chats.length + CONFIG.CHATS.DEFAULT_LIMIT - 1);
       
       if (error) throw new Error(error.message);
       
@@ -323,14 +335,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     if (isOnline) {
       try {
-        const { data: sentMessage, error } = await chatService.sendMessage(
-          chatId,
-          senderId,
-          text.trim(),
-          undefined,
-          undefined,
-          type
-        );
+        const { data: sentMessage, error } = await supabase
+          .from('messages')
+          .insert({
+            chat_id: chatId,
+            sender_id: senderId,
+            content: text.trim(),
+            type: type || 'text'
+          })
+          .select()
+          .single();
 
         if (error) {
           throw new Error(error.message);
@@ -400,7 +414,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       if (isOnline) {
-        const { data, error } = await chatService.getChatMessages(chatId);
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', { ascending: true });
         
         if (error) throw new Error(error.message);
         
@@ -444,7 +462,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ loadingMoreMessages: true });
     
     try {
-      const { data, error } = await chatService.getChatMessages(chatId, CONFIG.MESSAGES.DEFAULT_LIMIT);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .range(messageOffset, messageOffset + CONFIG.MESSAGES.DEFAULT_LIMIT - 1);
       
       if (error) throw new Error(error.message);
       
@@ -601,14 +624,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       for (const message of offlineMessages) {
         try {
-          await chatService.sendMessage(
-            message.chatId,
-            message.senderId,
-            message.text,
-            undefined,
-            undefined,
-            message.type
-          );
+          await supabase
+            .from('messages')
+            .insert({
+              chat_id: message.chatId,
+              sender_id: message.senderId,
+              content: message.text,
+              type: message.type || 'text'
+            });
           
           // Remove from offline queue
           await offlineStorage.removeOfflineMessage(message.id!);
@@ -672,5 +695,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error: any) {
       set({ error: error.message, isLoading: false });
     }
+  },
+  
+  // Performance monitoring implementation
+  getPerformanceStats: () => {
+    const state = get();
+    return {
+      subscriptions: realtimeManager.getStats().activeSubscriptions,
+      cacheSize: state.messages.length + state.chats.length,
+      memoryUsage: Math.round((performance as any).memory?.usedJSHeapSize / 1024 / 1024 || 0)
+    };
   }
 }));

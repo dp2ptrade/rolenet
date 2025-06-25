@@ -5,6 +5,8 @@ import { webrtcService, WebRTCCallbacks, CallData } from '../lib/webrtcService';
 import { MediaStream, MediaStreamConstructor } from '../lib/webrtcCompat';
 import { AppState } from 'react-native';
 import { useUserStore } from './useUserStore';
+import { realtimeManager } from '../lib/realtimeManager';
+import { callDataManager } from '../lib/dataLoadingManager';
 
 type RNMediaStream = InstanceType<MediaStreamConstructor>;
 
@@ -19,6 +21,8 @@ interface CallState {
   isLoading: boolean;
   subscription: any;
   currentSubscriptionCallId?: string; // Track the current call ID we're subscribed to
+  // Real-time subscriptions
+  subscriptions: Map<string, string>; // Store subscription IDs
   callStatus: 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';
   localStream: RNMediaStream | null;
   remoteStream: RNMediaStream | null;
@@ -60,6 +64,15 @@ interface CallState {
   subscribeToCall: (callId: string) => void;
   unsubscribeFromCall: () => void;
   
+  // Enhanced real-time subscription methods
+  subscribeToCallUpdates: () => void;
+  unsubscribeFromCallUpdates: () => void;
+  subscribeToIncomingCalls: (userId: string) => void;
+  unsubscribeFromIncomingCalls: (userId: string) => void;
+  
+  // Performance monitoring
+  getCallPerformanceStats: () => any;
+  
   // App state integration methods
   handleCallNotification: (callData: CallData) => void;
   notifyAppStateOfCall: (callId: string) => void;
@@ -78,6 +91,7 @@ export const useCallStore = create<CallState>((set, get) => ({
   isLoading: false,
   subscription: null,
   currentSubscriptionCallId: undefined,
+  subscriptions: new Map(),
   callStatus: 'idle',
   localStream: null,
   remoteStream: null,
@@ -325,7 +339,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
   
-  loadCallHistory: async () => {
+  loadCallHistory: async (page = 0) => {
     try {
       set({ isLoading: true });
       const currentUser = useUserStore.getState().user;
@@ -334,21 +348,24 @@ export const useCallStore = create<CallState>((set, get) => ({
         throw new Error('No user logged in');
       }
       
-      const { data: history, error } = await callService.getCallHistory(currentUser.id);
+      const result = await callService.getCallHistory(currentUser.id, 50);
       
-      if (error) {
-        throw error;
+      if (result.error) {
+        throw new Error(`Failed to load calls: ${result.error.message}`);
       }
-      
+
       // Calculate missed calls count
-      const missedCalls = (history || []).filter((call: Call) => 
+      const missedCalls = (result.data || []).filter((call: Call) => 
         call.status === 'missed' && call.callee_id === currentUser.id
       );
-      
+
       set({ 
-        callHistory: history || [],
+        callHistory: result.data || [],
         missedCallsCount: missedCalls.length
       });
+      
+      // Subscribe to call updates after loading history
+      get().subscribeToCallUpdates();
     } catch (error) {
       console.error('Load call history error:', error);
       throw error;
@@ -513,5 +530,156 @@ export const useCallStore = create<CallState>((set, get) => ({
     
     // Log current call state
     get().logCallState();
+  },
+
+  // Enhanced real-time subscription methods
+  subscribeToCallUpdates: () => {
+    const { subscriptions } = get();
+    
+    if (subscriptions.has('call_updates')) {
+      return;
+    }
+    
+    try {
+      const subscriptionId = realtimeManager.subscribe(
+        'calls',
+        '', // Subscribe to all call updates
+        (payload) => {
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          
+          switch (eventType) {
+            case 'INSERT':
+              if (newRecord && newRecord.status === 'incoming') {
+                get().setIncomingCall(newRecord);
+              }
+              break;
+            case 'UPDATE':
+              if (newRecord) {
+                // Handle call status updates
+                if (newRecord.status === 'ended') {
+                  get().endCall();
+                } else if (newRecord.status === 'accepted') {
+                  get().setInCall(true);
+                }
+                
+                // Update call history
+                const currentHistory = get().callHistory;
+                const updatedHistory = currentHistory.map(call => 
+                  call.id === newRecord.id ? { ...call, ...newRecord } : call
+                );
+                get().setCallHistory(updatedHistory);
+              }
+              break;
+            case 'BATCH_UPDATE':
+              // Handle batched call updates
+              if (payload.updates) {
+                payload.updates.forEach((update: any) => {
+                  if (payload.type === 'UPDATE') {
+                    const currentHistory = get().callHistory;
+                    const updatedHistory = currentHistory.map(call => 
+                      call.id === update.id ? { ...call, ...update } : call
+                    );
+                    get().setCallHistory(updatedHistory);
+                  }
+                });
+              }
+              break;
+          }
+        },
+        { throttle: true, batch: true }
+      );
+      
+      set(state => ({
+        subscriptions: new Map(state.subscriptions).set('call_updates', subscriptionId)
+      }));
+      
+      console.log('[CallStore] Subscribed to call updates');
+    } catch (error) {
+      console.error('[CallStore] Failed to subscribe to call updates:', error);
+    }
+  },
+  
+  unsubscribeFromCallUpdates: () => {
+    const { subscriptions } = get();
+    const subscriptionId = subscriptions.get('call_updates');
+    
+    if (subscriptionId) {
+      realtimeManager.unsubscribe(subscriptionId);
+      
+      const newSubscriptions = new Map(subscriptions);
+      newSubscriptions.delete('call_updates');
+      
+      set({ subscriptions: newSubscriptions });
+      console.log('[CallStore] Unsubscribed from call updates');
+    }
+  },
+  
+  subscribeToIncomingCalls: (userId: string) => {
+    const { subscriptions } = get();
+    const subscriptionKey = `incoming_calls_${userId}`;
+    
+    if (subscriptions.has(subscriptionKey)) {
+      return;
+    }
+    
+    try {
+      const subscriptionId = realtimeManager.subscribe(
+        'calls',
+        `receiver_id=eq.${userId}`,
+        (payload) => {
+          const { eventType, new: newRecord } = payload;
+          
+          if (eventType === 'INSERT' && newRecord && newRecord.status === 'incoming') {
+            get().setIncomingCall(newRecord);
+            console.log('[CallStore] Incoming call received:', newRecord);
+          }
+        },
+        { throttle: false } // Don't throttle incoming calls
+      );
+      
+      set(state => ({
+        subscriptions: new Map(state.subscriptions).set(subscriptionKey, subscriptionId)
+      }));
+      
+      console.log(`[CallStore] Subscribed to incoming calls for user: ${userId}`);
+    } catch (error) {
+      console.error('[CallStore] Failed to subscribe to incoming calls:', error);
+    }
+  },
+  
+  unsubscribeFromIncomingCalls: (userId: string) => {
+    const { subscriptions } = get();
+    const subscriptionKey = `incoming_calls_${userId}`;
+    const subscriptionId = subscriptions.get(subscriptionKey);
+    
+    if (subscriptionId) {
+      realtimeManager.unsubscribe(subscriptionId);
+      
+      const newSubscriptions = new Map(subscriptions);
+      newSubscriptions.delete(subscriptionKey);
+      
+      set({ subscriptions: newSubscriptions });
+      console.log(`[CallStore] Unsubscribed from incoming calls for user: ${userId}`);
+    }
+  },
+
+  // Get call performance statistics
+  getCallPerformanceStats: () => {
+    const realtimeStats = realtimeManager.getStats();
+    const callDataStats = callDataManager.getStats();
+    
+    return {
+      realtime: realtimeStats,
+      callData: callDataStats,
+      subscriptions: get().subscriptions.size,
+      callHistory: get().callHistory.length,
+      currentCallState: {
+        incomingCall: !!get().incomingCall,
+        outgoingCall: !!get().outgoingCall,
+        inCall: get().isInCall,
+        muted: get().isMuted,
+        speakerOn: get().isSpeakerOn
+      }
+    };
   },
 }));

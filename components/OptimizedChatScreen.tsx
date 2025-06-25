@@ -48,6 +48,8 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useUserStore } from '@/stores/useUserStore';
 import { useChatStore } from '@/stores/useChatStore';
+import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
+import { useOptimizedMessages, useOptimizedTyping, useOptimizedSearch } from '@/hooks/useChatOptimizations';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { supabase } from '../lib/supabase';
 import { chatService } from '../lib/supabaseService';
@@ -58,7 +60,6 @@ import { VoiceSearchService } from '@/lib/voiceSearch';
 import { Audio } from 'expo-av';
 import { ScrollView } from 'react-native';
 import { useAppStateStore } from '@/stores/useAppStateStore';
-import { useOptimizedMessages, useOptimizedSearch } from '@/hooks/useChatOptimizations';
 import { useDebounce, useDebouncedCallback, useThrottledCallback } from '@/utils/performance';
 import { LoadingSpinner, SkeletonLoader } from '@/components/LoadingSpinner';
 import { Message } from '@/lib/types';
@@ -238,20 +239,38 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
   const chatStore = useChatStore();
   const { friends } = useFriendStore();
   const { updateActivity } = useAppStateStore();
+  
+  // Performance monitoring
+  const {
+    metrics,
+    alerts,
+    isMonitoring,
+    trackFrame,
+    getRecommendations
+  } = usePerformanceMonitor({
+    enabled: true,
+    interval: 10000, // Monitor every 10 seconds
+    alertThresholds: {
+      memoryWarning: 0.8,
+      subscriptionWarning: 15,
+      latencyWarning: 1000
+    }
+  });
 
   // Custom hooks for optimizations
-  // Custom hooks for optimizations
   const { sortedMessages: optimizedMessages, pinnedMessages } = useOptimizedMessages(messages);
-  const { searchResults: searchMessages, updateSearchQuery, clearSearch } = useOptimizedSearch(messages);
+  const { isTyping: optimizedIsTyping, startTyping, stopTyping } = useOptimizedTyping(chatId as string, currentUser?.id || '');
   
   // Typing handlers
   const handleTypingStart = useCallback(() => {
-    // Add typing start logic here
-  }, []);
+    startTyping();
+    setIsTyping(true);
+  }, [startTyping]);
   
   const handleTypingStop = useCallback(() => {
-    // Add typing stop logic here
-  }, []);
+    stopTyping();
+    setIsTyping(false);
+  }, [stopTyping]);
 
   // Debounced functions
   const debouncedTyping = useDebouncedCallback(handleTypingStart, 300);
@@ -279,6 +298,9 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
 
     const messageText = inputText.trim();
     setInputText('');
+    handleTypingStop();
+    
+    const startTime = performance.now();
     
     try {
       await chatStore.sendMessage({
@@ -287,6 +309,10 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
         senderId: currentUser.id
       });
 
+      // Track performance
+      const endTime = performance.now();
+      trackFrame(endTime - startTime);
+
       // Scroll to bottom after sending
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -294,29 +320,20 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
+      // Restore message on error
+      setInputText(messageText);
     }
-  }, [inputText, currentUser?.id, chatId, userId, chatStore]);
+  }, [inputText, currentUser?.id, chatId, chatStore, handleTypingStop, trackFrame]);
 
   const handleInputChange = useCallback((text: string) => {
     setInputText(text);
     
-    // Handle typing indicators
     if (text.length > 0 && !isTyping) {
-      setIsTyping(true);
-      debouncedTyping();
+      handleTypingStart();
+    } else if (text.length === 0 && isTyping) {
+      handleTypingStop();
     }
-    
-    // Clear typing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    // Set new timeout to stop typing
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      debouncedStopTyping();
-    }, 1000);
-  }, [isTyping, debouncedTyping, debouncedStopTyping]);
+  }, [isTyping, handleTypingStart, handleTypingStop]);
 
   const handleMessageLongPress = useCallback((message: Message, position: { x: number; y: number }) => {
     setSelectedMessage(message);
@@ -372,33 +389,78 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
     index,
   }), []);
 
-  // Load messages effect
+  // Load messages and setup subscriptions on mount
   useEffect(() => {
-    const loadMessages = async () => {
+    const initializeChat = async () => {
       if (!chatId || !currentUser?.id) return;
       
       setIsLoading(true);
+      const startTime = performance.now();
+      
       try {
+        // Load initial messages
         await chatStore.loadChatMessages(chatId as string);
-        // Messages are updated through store state
+        
+        // Subscribe to real-time updates
+        chatStore.subscribeToMessages(chatId as string);
+        
+        // Track initialization performance
+        const endTime = performance.now();
+        trackFrame(endTime - startTime);
+        
       } catch (error) {
-        console.error('Error loading messages:', error);
+        console.error('Error initializing chat:', error);
+        Alert.alert('Error', 'Failed to load chat. Please try again.');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadMessages();
-  }, [chatId, currentUser?.id, chatStore]);
-
-  // Cleanup effect
-  useEffect(() => {
+    initializeChat();
+    
+    // Cleanup subscriptions on unmount
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+      if (chatId) {
+        chatStore.unsubscribeFromMessages();
       }
+      handleTypingStop();
     };
-  }, []);
+  }, [chatId, currentUser?.id, chatStore, trackFrame, handleTypingStop]);
+
+  // Handle performance alerts
+  useEffect(() => {
+    if (alerts.length > 0) {
+      const highPriorityAlerts = alerts.filter(alert => alert.severity === 'high');
+      
+      if (highPriorityAlerts.length > 0) {
+        console.warn('[OptimizedChatScreen] Performance alerts:', highPriorityAlerts);
+        
+        // Take automatic action for critical issues
+        highPriorityAlerts.forEach(alert => {
+          if (alert.type === 'memory') {
+            console.log('Memory pressure detected - consider optimizing');
+          } else if (alert.type === 'subscriptions') {
+            console.log('Too many subscriptions detected');
+          }
+        });
+      }
+    }
+  }, [alerts]);
+  
+  // Performance stats for development
+  const performanceStats = useMemo(() => {
+    if (!__DEV__ || !metrics) return null;
+    
+    const chatStats = chatStore.getPerformanceStats?.() || {};
+    
+    return {
+      subscriptions: metrics.realtime.activeSubscriptions,
+      memoryUsage: Math.round(metrics.memory.heapUsed),
+      cacheHitRate: Math.round(metrics.dataLoading.cacheHitRate * 100),
+      messagesCount: messages.length,
+      isResponsive: metrics.ui.isResponsive
+    };
+  }, [metrics, messages.length, chatStore]);
 
   // Redirect to group chat if needed
   if (isGroupChat && chatId) {
@@ -430,12 +492,40 @@ const OptimizedChatScreen: React.FC<ChatScreenProps> = (props) => {
         />
         <Appbar.Content
           title={userName || chatName || 'Chat'}
-          subtitle={isTyping ? 'typing...' : 'online'}
+          subtitle={optimizedIsTyping ? 'typing...' : 'online'}
         />
         <Appbar.Action icon="phone" onPress={() => {}} />
         <Appbar.Action icon="video" onPress={() => {}} />
         <Appbar.Action icon="dots-vertical" onPress={() => {}} />
       </Appbar.Header>
+      
+      {/* Performance Stats (Development Only) */}
+      {__DEV__ && performanceStats && (
+        <Surface style={styles.performanceHeader}>
+          <Text style={styles.performanceText}>
+            Subs: {performanceStats.subscriptions} | 
+            Mem: {performanceStats.memoryUsage}MB | 
+            Cache: {performanceStats.cacheHitRate}% | 
+            Msgs: {performanceStats.messagesCount} |
+            {performanceStats.isResponsive ? ' ✅' : ' ⚠️'}
+          </Text>
+          {alerts.length > 0 && (
+            <Text style={styles.alertText}>
+              {alerts.length} alert(s)
+            </Text>
+          )}
+        </Surface>
+      )}
+      
+      {/* Performance Recommendations (Development Only) */}
+      {__DEV__ && getRecommendations().length > 0 && (
+        <Surface style={styles.recommendationsContainer}>
+          <Text style={styles.recommendationsTitle}>Performance Tips:</Text>
+          {getRecommendations().slice(0, 2).map((rec, index) => (
+            <Text key={index} style={styles.recommendationText}>• {rec}</Text>
+          ))}
+        </Surface>
+      )}
 
       <KeyboardAvoidingView
         style={styles.keyboardContainer}
@@ -520,6 +610,37 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     elevation: 2,
+  },
+  performanceHeader: {
+    backgroundColor: '#e3f2fd',
+    padding: 8,
+    elevation: 1,
+  },
+  performanceText: {
+    fontSize: 12,
+    color: '#1976d2',
+    fontFamily: 'monospace',
+  },
+  alertText: {
+    fontSize: 12,
+    color: '#d32f2f',
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  recommendationsContainer: {
+    backgroundColor: '#fff3e0',
+    padding: 8,
+    elevation: 1,
+  },
+  recommendationsTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#f57c00',
+    marginBottom: 4,
+  },
+  recommendationText: {
+    fontSize: 11,
+    color: '#f57c00',
   },
   keyboardContainer: {
     flex: 1,
