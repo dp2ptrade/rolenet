@@ -682,4 +682,32 @@ export const useCallStore = create<CallState>((set, get) => ({
       }
     };
   },
+
+  // Cleanup method to prevent memory leaks
+  cleanup: () => {
+    const { subscriptions } = get();
+    
+    // Unsubscribe from all active subscriptions
+    subscriptions.forEach((subscriptionId, key) => {
+      realtimeManager.unsubscribe(subscriptionId);
+      console.log(`[CallStore] Cleaned up subscription: ${key}`);
+    });
+    
+    // Reset store state
+    set({
+      subscriptions: new Map(),
+      currentCall: null,
+      incomingCall: null,
+      outgoingCall: null,
+      isInCall: false,
+      callInBackground: false,
+      localStream: null,
+      remoteStream: null,
+      connectionState: 'new',
+      callStatus: 'idle',
+      isLoading: false
+    });
+    
+    console.log('[CallStore] Cleanup completed');
+  },
 }));

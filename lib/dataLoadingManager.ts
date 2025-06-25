@@ -352,10 +352,25 @@ class DataLoadingManager<T extends { id: string | number } = any> {
     // Remove oldest 25% of entries
     const toRemove = Math.floor(entries.length * 0.25);
     for (let i = 0; i < toRemove; i++) {
-      this.cache.delete(entries[i][0]);
+      const keyToRemove = entries[i][0];
+      this.cache.delete(keyToRemove);
+      this.loadingStates.delete(keyToRemove);
+      this.lastExecutionTimes.delete(keyToRemove);
     }
 
-    console.log(`[DataLoadingManager] Cleaned up ${toRemove} old cache entries`);
+    // Also clean up stale lastExecutionTimes entries (older than 1 hour)
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    const executionEntries = Array.from(this.lastExecutionTimes.entries());
+    let cleanedExecutionEntries = 0;
+    
+    for (const [key, timestamp] of executionEntries) {
+      if (timestamp < oneHourAgo) {
+        this.lastExecutionTimes.delete(key);
+        cleanedExecutionEntries++;
+      }
+    }
+
+    console.log(`[DataLoadingManager] Cleaned up ${toRemove} old cache entries and ${cleanedExecutionEntries} stale execution times`);
   }
 
   /**
@@ -429,9 +444,11 @@ class DataLoadingManager<T extends { id: string | number } = any> {
     if (key) {
       this.cache.delete(key);
       this.loadingStates.delete(key);
+      this.lastExecutionTimes.delete(key);
     } else {
       this.cache.clear();
       this.loadingStates.clear();
+      this.lastExecutionTimes.clear();
     }
   }
 
@@ -461,6 +478,7 @@ class DataLoadingManager<T extends { id: string | number } = any> {
     this.cache.clear();
     this.loadingStates.clear();
     this.activeRequests.clear();
+    this.lastExecutionTimes.clear();
     
     console.log('[DataLoadingManager] Cleanup completed');
   }
