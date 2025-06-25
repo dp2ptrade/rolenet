@@ -169,3 +169,81 @@ Screens to Implement:
 
 Goal:
 Build a complete and production-ready mobile app using React Native and Expo, with Firebase and Zustand, that connects people professionally across roles and needs — globally and locally — with support for discovery, pings, calling, chatting and friend networking.
+
+
+
+New additinal page: (Posts)
+
+Core Features of the Post Page
+Here’s a strong base post page structure:
+🧱 Post Card Structure
+Each service post should include:
+* Title of the Service (e.g., "Full-stack Web Development", "Legal Consultancy for Startups")
+* Professional Name + Profile Link
+* Category (e.g., Developer, Designer, Lawyer, Consultant, Coach)
+* Location / Remote Availability
+* Brief Description (up to 200 characters)
+* Tags/Skills (e.g., #React, #UXDesign, #StartupLaw)
+* Pricing (Fixed or Hourly)
+* Availability Timeline (e.g., "Available from July", "Immediate Start")
+* Ratings / Reviews Count
+* Pin / Book Now / Chat CTA
+* Bookmark / Save Button
+
+🔍 Search & Filter Options
+Let users search and sort service posts with:
+* Search Bar (by keyword, tag, title)
+* Category Filter (dropdown or chips)
+* Location Filter (city, country, remote)
+* Sort By: Newest, Top Rated, Price (low to high), Availability
+* Experience Level: Junior, Mid, Senior
+* Service Type: One-time, Long-term, Consulting, Coaching
+* Rating Filter (4+ stars etc.)
+* Price Range Slider
+
+🌟 Suggestions to Make the Post Page Unique & Powerful
+✅ 1. AI Match Score
+Show how well a post matches the user's profile or needs using AI. For example: “87% Match — Based on your interest in mobile app development”
+
+✅ 2. Video/Voice/Image Pitch Support
+Let professionals attach a 1-minute video pitch or voice intro or Image to their post — helps humanize the service offering and builds trust.
+
+✅ 3. Smart Availability Calendar
+Professionals can show a calendar with their availability, and users can book slots or consultations directly from the post.
+
+✅ 4. “Service Bundle” or “Starter Package”
+Professionals can offer predefined service bundles, e.g.:
+* 💼 “Portfolio Website in 3 Days — $150”
+* 📄 “Legal Audit for Startup Docs — $99”
+
+✅ 5. Verified Badge / Background Check
+A badge for verified professionals (verified ID or credentials) to boost credibility.
+
+✅ 6. Microblog or Case Studies
+Allow professionals to add a short post or success story as a "showcase" linked to the service. (e.g., “I helped X company grow 300% with SEO”)
+
+✅ 7. Collaborative Projects
+Let multiple professionals co-create a post (e.g., a designer + developer offering a complete app design + build service).
+
+✅ 8. Live Chat or Consultation Booking
+* Quick DM option
+* Or allow scheduling a free discovery call via calendar integration
+
+✅ 9. Reputation Metrics
+* Success rate
+* Total projects completed via the platform
+* Avg. response time
+
+✅ 10. Post Boosting
+Professionals can boost their post to appear on top or get featured in a category.
+
+🎨 UI Design Suggestions
+* Masonry/Grid View of post cards
+* Use of category color tags or badges
+* Sticky filters/sidebar for better UX
+
+📲 Bonus: Mobile Experience
+Make sure the post card and filters are:
+* Tap-friendly
+* Scrollable (to go through posts like cards)
+* Has a floating “Filter” and “Sort” button
