@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { Drawer } from 'react-native-drawer-layout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, IconButton, List, Divider, Surface } from 'react-native-paper';
-import { FileText, PlusCircle, Bookmark, User, Settings, ChevronLeft, Menu } from 'lucide-react-native';
+import { FileText, CirclePlus as PlusCircle, Bookmark, User, Settings, ChevronLeft, Menu } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
