@@ -56,6 +56,7 @@ class WebRTCService {
   private isInitiator = false;
   private userId: string | null = null;
   private isSubscribed: boolean = false;
+  private isWebRTCSupported: boolean = false;
 
   // STUN/TURN servers configuration
   private readonly pcConfig = {
@@ -107,13 +108,25 @@ class WebRTCService {
   }
 
   async initialize(userId: string, callbacks: WebRTCCallbacks): Promise<void> {
-    if (!isWebRTCAvailable()) {
-      throw new Error('WebRTC is not available on this device');
-    }
-
     this.userId = userId;
     this.callbacks = callbacks;
-    
+    this.isWebRTCSupported = isWebRTCAvailable();
+
+    if (!this.isWebRTCSupported) {
+      console.warn('⚠️ WebRTC is not available on this device/platform. Call functionality will be limited.');
+      this.callbacks.onWarning?.('Voice calling is not available on this platform. Please use a mobile device for full calling functionality.');
+      
+      // Still set up realtime subscription for other features
+      try {
+        await this.setupRealtimeSubscription();
+        console.log('✅ WebRTC service initialized with limited functionality');
+      } catch (error) {
+        console.error('❌ Failed to initialize WebRTC service:', error);
+        throw error;
+      }
+      return;
+    }
+
     try {
       await this.setupRealtimeSubscription();
       console.log('✅ WebRTC service initialized successfully');
@@ -159,6 +172,11 @@ class WebRTCService {
   }
 
   private handleSignalingMessage(message: SignalingMessage): void {
+    if (!this.isWebRTCSupported) {
+      console.warn('⚠️ Received signaling message but WebRTC is not supported');
+      return;
+    }
+
     if (!message || message.callId !== this.currentCallId) {
       return;
     }
@@ -190,6 +208,12 @@ class WebRTCService {
   }
 
   async makeCall(targetUserId: string, includeVideo: boolean = false): Promise<string> {
+    if (!this.isWebRTCSupported) {
+      const error = new Error('Voice calling is not supported on this platform. Please use a mobile device.');
+      this.callbacks.onError?.(error);
+      throw error;
+    }
+
     if (!this.userId) {
       throw new Error('WebRTC service not initialized');
     }
@@ -262,6 +286,12 @@ class WebRTCService {
   }
 
   async acceptCall(callId: string): Promise<void> {
+    if (!this.isWebRTCSupported) {
+      const error = new Error('Voice calling is not supported on this platform. Please use a mobile device.');
+      this.callbacks.onError?.(error);
+      throw error;
+    }
+
     try {
       this.currentCallId = callId;
       this.isInitiator = false;
@@ -353,8 +383,8 @@ class WebRTCService {
   }
 
   toggleMute(): boolean {
-    if (!this.localStream) {
-      console.warn('⚠️ No local stream available for muting');
+    if (!this.isWebRTCSupported || !this.localStream) {
+      console.warn('⚠️ No local stream available for muting or WebRTC not supported');
       return false;
     }
 
@@ -370,6 +400,11 @@ class WebRTCService {
   }
 
   async toggleSpeaker(): Promise<boolean> {
+    if (!this.isWebRTCSupported) {
+      console.warn('⚠️ Speaker toggle not supported - WebRTC not available');
+      return false;
+    }
+
     try {
       if (Platform.OS === 'ios') {
         return await this.toggleSpeakerIOS();
@@ -452,6 +487,10 @@ class WebRTCService {
   }
 
   private async setupPeerConnection(): Promise<void> {
+    if (!this.isWebRTCSupported) {
+      throw new Error('WebRTC is not supported on this platform');
+    }
+
     const maxSetupAttempts = 3;
     let setupAttempts = 0;
 
@@ -568,6 +607,10 @@ class WebRTCService {
   }
 
   private async getLocalStream(): Promise<void> {
+    if (!this.isWebRTCSupported) {
+      throw new Error('WebRTC is not supported on this platform');
+    }
+
     if (this.localStream) {
       console.log('Local stream already exists');
       return;
@@ -648,8 +691,8 @@ class WebRTCService {
   }
 
   private async handleOffer(offer: RTCSessionDescriptionInit): Promise<void> {
-    if (!this.peerConnection) {
-      throw new Error('Peer connection not initialized');
+    if (!this.isWebRTCSupported || !this.peerConnection) {
+      throw new Error('Peer connection not initialized or WebRTC not supported');
     }
 
     const maxRetries = 3;
@@ -692,8 +735,8 @@ class WebRTCService {
   }
 
   private async handleAnswer(answer: RTCSessionDescriptionInit): Promise<void> {
-    if (!this.peerConnection) {
-      throw new Error('Peer connection not initialized');
+    if (!this.isWebRTCSupported || !this.peerConnection) {
+      throw new Error('Peer connection not initialized or WebRTC not supported');
     }
 
     const maxRetries = 3;
@@ -725,8 +768,8 @@ class WebRTCService {
   }
 
   private async handleIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
-    if (!this.peerConnection) {
-      console.warn('⚠️ Peer connection not initialized, ignoring ICE candidate');
+    if (!this.isWebRTCSupported || !this.peerConnection) {
+      console.warn('⚠️ Peer connection not initialized or WebRTC not supported, ignoring ICE candidate');
       return;
     }
 
@@ -781,6 +824,13 @@ class WebRTCService {
     }
 
     console.log('📞 Incoming call from:', callData.caller_id);
+    
+    if (!this.isWebRTCSupported) {
+      console.warn('⚠️ Incoming call received but WebRTC is not supported on this platform');
+      this.callbacks.onWarning?.('Voice calling is not available on this platform. Please use a mobile device for full calling functionality.');
+      return;
+    }
+    
     this.callbacks.onIncomingCall?.(callData);
   }
 
@@ -882,11 +932,12 @@ class WebRTCService {
     }
   }
 
-  getSubscriptionStatus(): { isSubscribed: boolean; hasChannel: boolean; userId: string | null } {
+  getSubscriptionStatus(): { isSubscribed: boolean; hasChannel: boolean; userId: string | null; isWebRTCSupported: boolean } {
     return {
       isSubscribed: this.isSubscribed,
       hasChannel: !!this.channel,
-      userId: this.userId
+      userId: this.userId,
+      isWebRTCSupported: this.isWebRTCSupported
     };
   }
 
