@@ -112,11 +112,7 @@ export default function PostsLayout() {
     >
       <Stack
         screenOptions={{
-<<<<<<< HEAD
           headerShown: false,
-=======
-          headerShown: true,
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
           headerStyle: { backgroundColor: '#F8FAFC' },
           headerShadowVisible: false,
           headerLeft: () => (
@@ -132,10 +128,7 @@ export default function PostsLayout() {
         <Stack.Screen
           name="index"
           options={{
-<<<<<<< HEAD
             headerShown: true,
-=======
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
             title: "Service Posts",
             headerTitle: "Service Posts",
           }}
@@ -170,26 +163,7 @@ export default function PostsLayout() {
             presentation: 'modal',
           }}
         />
-<<<<<<< HEAD
 
-=======
-        <Stack.Screen
-          name="[id]/index"
-          options={{
-            title: "Post Details",
-            headerTitle: "Service Details",
-            headerBackTitle: "Back",
-          }}
-        />
-        <Stack.Screen
-          name="[id]/book"
-          options={{
-            title: "Book Service",
-            headerTitle: "Book Service",
-            headerBackTitle: "Back",
-          }}
-        />
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
       </Stack>
     </Drawer>
   );
@@ -246,8 +220,4 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     marginHorizontal: 16,
   },
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7

@@ -396,11 +396,8 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-<<<<<<< HEAD
     flex: 1,
     marginRight: 8,
-=======
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   },
   avatarContainer: {
     position: 'relative',
@@ -436,11 +433,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   bookmarkButton: {
-<<<<<<< HEAD
     marginLeft: 0,
-=======
-    margin: 0,
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   },
   titleContainer: {
     marginBottom: 12,
@@ -659,8 +652,4 @@ const styles = StyleSheet.create({
 // Import ScrollView
 import { ScrollView } from 'react-native';
 
-<<<<<<< HEAD
 export default PostCard;
-=======
-export default PostCard;
->>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
