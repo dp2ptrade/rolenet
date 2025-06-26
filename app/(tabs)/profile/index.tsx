@@ -3,15 +3,15 @@ import { View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
 
-export default function PostsTab() {
+export default function ProfileTab() {
   useEffect(() => {
-    // Redirect to the main posts screen
-    router.replace('/posts');
+    // Redirect to the main profile screen
+    router.replace('/profile');
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text>Redirecting to Posts...</Text>
+      <Text>Redirecting to Profile...</Text>
     </View>
   );
 }

@@ -14,7 +14,6 @@ import { UserService } from '../lib/supabaseService';
 import AppSidebar from '../components/AppSidebar';
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
-import TabLayout from './(tabs)/_layout';
 import { isWeb } from '../utils/platform';
 
 const theme = {
@@ -214,14 +213,7 @@ export default function RootLayout() {
               <Stack.Screen name="auth/signin" />
               <Stack.Screen name="auth/signup" />
               <Stack.Screen name="onboarding" />
-              <Stack.Screen name="(tabs)/discover" redirect={true} />
-              <Stack.Screen name="(tabs)/activity" redirect={true} />
-              <Stack.Screen name="(tabs)/chats" redirect={true} />
-              <Stack.Screen name="(tabs)/calls" redirect={true} />
-              <Stack.Screen name="(tabs)/posts" redirect={true} />
-              <Stack.Screen name="(tabs)/friends" redirect={true} />
-              <Stack.Screen name="(tabs)/notifications" redirect={true} />
-              <Stack.Screen name="(tabs)/profile" redirect={true} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="+not-found" />
             </Stack>
