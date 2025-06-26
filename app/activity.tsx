@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Card, Button, Surface, Avatar, Chip, IconButton, Snackbar } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Clock, Check, X, MessageSquare, Phone, MenuIcon } from 'lucide-react-native';
+import { Clock, Check, X, MessageSquare, Phone, Menu as MenuIcon } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { usePingStore } from '@/stores/usePingStore';
 import { useUserStore } from '@/stores/useUserStore';
