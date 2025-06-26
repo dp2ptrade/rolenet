@@ -14,7 +14,6 @@ import { UserService } from '../lib/supabaseService';
 import AppSidebar from '../components/AppSidebar';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout'
-import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 
 const theme = {
   ...DefaultTheme,
