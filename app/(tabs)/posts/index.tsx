@@ -264,3 +264,4 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 });
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7

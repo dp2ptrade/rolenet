@@ -12,10 +12,16 @@ import { useAppStateStore } from '../stores/useAppStateStore';
 import IncomingCallModal from '../components/IncomingCallModal';
 import { UserService } from '../lib/supabaseService';
 import AppSidebar from '../components/AppSidebar';
+<<<<<<< HEAD
 import { View, StyleSheet, Dimensions, Platform } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
 import TabLayout from './(tabs)/_layout';
 import { isWeb } from '../utils/platform';
+=======
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { Drawer } from 'react-native-drawer-layout'
+import { useFrameworkReady } from '@/hooks/useFrameworkReady'
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
 
 const theme = {
   ...DefaultTheme,
@@ -204,7 +210,21 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
+<<<<<<< HEAD
         {isWeb ? (
+=======
+        <Drawer
+          open={open}
+          onOpen={() => setOpen(true)}
+          onClose={() => setOpen(false)}
+          renderDrawerContent={() => <AppSidebar onClose={() => setOpen(false)} />}
+          drawerType={isLargeScreen ? 'permanent' : 'front'}
+          drawerStyle={[
+            styles.drawer,
+            isLargeScreen && styles.permanentDrawer
+          ]}
+        >
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
           <View style={styles.mainContent}>
             <Stack screenOptions={{ 
               headerShown: false,
@@ -214,6 +234,7 @@ export default function RootLayout() {
               <Stack.Screen name="auth/signin" />
               <Stack.Screen name="auth/signup" />
               <Stack.Screen name="onboarding" />
+<<<<<<< HEAD
               <Stack.Screen name="(tabs)/discover" redirect={true} />
               <Stack.Screen name="(tabs)/activity" redirect={true} />
               <Stack.Screen name="(tabs)/chats" redirect={true} />
@@ -222,10 +243,21 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)/friends" redirect={true} />
               <Stack.Screen name="(tabs)/notifications" redirect={true} />
               <Stack.Screen name="(tabs)/profile" redirect={true} />
+=======
+              <Stack.Screen name="discover" />
+              <Stack.Screen name="activity" />
+              <Stack.Screen name="chats" />
+              <Stack.Screen name="calls" />
+              <Stack.Screen name="posts" />
+              <Stack.Screen name="friends" />
+              <Stack.Screen name="notifications" />
+              <Stack.Screen name="profile" />
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
               <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
               <Stack.Screen name="+not-found" />
             </Stack>
           </View>
+<<<<<<< HEAD
         ) : (
           <Drawer
             open={open}
@@ -254,6 +286,9 @@ export default function RootLayout() {
             </View>
           </Drawer>
         )}
+=======
+        </Drawer>
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
         
         {/* Global Incoming Call Modal */}
         {(() => {
@@ -303,4 +338,8 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
   }
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7

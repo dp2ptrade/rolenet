@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+<<<<<<< HEAD
 import { Text, TextInput, Button, Chip, Switch, HelperText, Divider, Surface, SegmentedButtons, Menu } from 'react-native-paper';
+=======
+import { Text, TextInput, Button, Chip, Switch, HelperText, Divider, Surface, SegmentedButtons } from 'react-native-paper';
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
 import { Post, PostCategory, User } from '@/lib/types';
 import { usePostStore } from '@/stores/usePostStore';
 import { useUserStore } from '@/stores/useUserStore';
@@ -49,18 +53,25 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
     initialValues?.availability_status || 'available'
   );
   const [availabilityDate, setAvailabilityDate] = useState<Date | null>(
+<<<<<<< HEAD
     initialValues?.availability_date 
       ? typeof initialValues.availability_date === 'string' 
         ? new Date(initialValues.availability_date) 
         : initialValues.availability_date
       : null
+=======
+    initialValues?.availability_date ? new Date(initialValues.availability_date) : null
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [mediaUrls, setMediaUrls] = useState<string[]>(initialValues?.media_urls || []);
   const [isUploading, setIsUploading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+<<<<<<< HEAD
   const [currencyMenuVisible, setCurrencyMenuVisible] = useState(false);
+=======
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   
   // Load categories on mount
   useEffect(() => {
@@ -126,7 +137,11 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
         experience_level: experienceLevel,
         service_type: serviceType,
         availability_status: availabilityStatus,
+<<<<<<< HEAD
         availability_date: availabilityDate || undefined,
+=======
+        availability_date: availabilityDate ? availabilityDate.toISOString() : undefined,
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
         media_urls: mediaUrls,
       };
       
@@ -356,6 +371,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                 left={<TextInput.Icon icon={() => <DollarSign size={20} color="#6B7280" />} />}
               />
               
+<<<<<<< HEAD
               <View style={styles.currencyContainer}>
                 <Menu
                   visible={currencyMenuVisible}
@@ -375,6 +391,18 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({
                   <Menu.Item onPress={() => { setCurrency('GBP'); setCurrencyMenuVisible(false); }} title="GBP" />
                 </Menu>
               </View>
+=======
+              <SegmentedButtons
+                value={currency}
+                onValueChange={setCurrency}
+                buttons={[
+                  { value: 'USD', label: 'USD' },
+                  { value: 'EUR', label: 'EUR' },
+                  { value: 'GBP', label: 'GBP' }
+                ]}
+                style={styles.currencyButtons}
+              />
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
             </View>
           )}
           
@@ -617,6 +645,7 @@ const styles = StyleSheet.create({
   currencyButtons: {
     width: 150,
   },
+<<<<<<< HEAD
   currencyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -625,6 +654,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+=======
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -687,4 +718,8 @@ const styles = StyleSheet.create({
 // Import IconButton
 import { IconButton } from 'react-native-paper';
 
+<<<<<<< HEAD
 export default CreatePostForm;
+=======
+export default CreatePostForm;
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
