@@ -5,7 +5,6 @@ import { initializeDebugging } from 'debug.config';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PaperProvider, DefaultTheme } from 'react-native-paper';
-import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import { useCallStore } from '../stores/useCallStore';
 import { useUserStore } from '../stores/useUserStore';
 import { useAppStateStore } from '../stores/useAppStateStore';
