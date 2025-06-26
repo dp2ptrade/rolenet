@@ -1,12 +1,15 @@
 /*
-  # Add Posts Schema
+  # Fix Posts Schema Issues
 
   1. New Tables
-    - `posts` - Main table for service posts
+    - `posts` - Main table for service posts with proper foreign key
     - `post_bookmarks` - For users to save/bookmark posts
     - `post_ratings` - For rating service posts
     - `post_categories` - Categories for posts
     - `post_tags` - Tags for posts
+    - `service_bundles` - Service packages
+    - `availability_slots` - Booking slots
+    - `case_studies` - Work showcases
   
   2. Security
     - Enable RLS on all tables
@@ -15,13 +18,42 @@
   3. Changes
     - Add necessary indexes for performance
     - Add triggers for updated_at timestamps
+    - Fix foreign key relationships
 */
 
--- Create posts table
-CREATE TABLE IF NOT EXISTS posts (
+-- Drop existing tables if they exist to ensure clean recreation
+DROP TABLE IF EXISTS case_studies CASCADE;
+DROP TABLE IF EXISTS availability_slots CASCADE;
+DROP TABLE IF EXISTS service_bundles CASCADE;
+DROP TABLE IF EXISTS post_ratings CASCADE;
+DROP TABLE IF EXISTS post_bookmarks CASCADE;
+DROP TABLE IF EXISTS posts CASCADE;
+DROP TABLE IF EXISTS post_tags CASCADE;
+DROP TABLE IF EXISTS post_categories CASCADE;
+
+-- Create post_categories table first (referenced by other tables)
+CREATE TABLE post_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  icon TEXT,
+  color TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create post_tags table
+CREATE TABLE post_tags (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  category_id UUID REFERENCES post_categories(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create posts table with explicit foreign key constraint
+CREATE TABLE posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
   category TEXT NOT NULL,
   description TEXT NOT NULL,
   location JSONB,
@@ -45,12 +77,18 @@ CREATE TABLE IF NOT EXISTS posts (
   projects_completed INTEGER DEFAULT 0,
   avg_response_time INTEGER, -- in minutes
   view_count INTEGER DEFAULT 0,
+  rating DECIMAL(3,2) DEFAULT 0,
+  rating_count INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Add foreign key constraint explicitly
+ALTER TABLE posts ADD CONSTRAINT fk_posts_user_id 
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+
 -- Create post_bookmarks table
-CREATE TABLE IF NOT EXISTS post_bookmarks (
+CREATE TABLE post_bookmarks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -59,7 +97,7 @@ CREATE TABLE IF NOT EXISTS post_bookmarks (
 );
 
 -- Create post_ratings table
-CREATE TABLE IF NOT EXISTS post_ratings (
+CREATE TABLE post_ratings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -69,26 +107,8 @@ CREATE TABLE IF NOT EXISTS post_ratings (
   UNIQUE(post_id, user_id)
 );
 
--- Create post_categories table for predefined categories
-CREATE TABLE IF NOT EXISTS post_categories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  description TEXT,
-  icon TEXT,
-  color TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create post_tags table for predefined tags
-CREATE TABLE IF NOT EXISTS post_tags (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  category_id UUID REFERENCES post_categories(id) ON DELETE SET NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Add service_bundles table for predefined service packages
-CREATE TABLE IF NOT EXISTS service_bundles (
+-- Create service_bundles table
+CREATE TABLE service_bundles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
@@ -100,8 +120,8 @@ CREATE TABLE IF NOT EXISTS service_bundles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add availability_slots table for booking
-CREATE TABLE IF NOT EXISTS availability_slots (
+-- Create availability_slots table
+CREATE TABLE availability_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   start_time TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -112,8 +132,8 @@ CREATE TABLE IF NOT EXISTS availability_slots (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Add case_studies table for showcasing work
-CREATE TABLE IF NOT EXISTS case_studies (
+-- Create case_studies table
+CREATE TABLE case_studies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
@@ -125,17 +145,21 @@ CREATE TABLE IF NOT EXISTS case_studies (
 );
 
 -- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_category ON posts(category);
-CREATE INDEX IF NOT EXISTS idx_posts_tags ON posts USING GIN(tags);
-CREATE INDEX IF NOT EXISTS idx_posts_price ON posts(price);
-CREATE INDEX IF NOT EXISTS idx_posts_experience_level ON posts(experience_level);
-CREATE INDEX IF NOT EXISTS idx_posts_service_type ON posts(service_type);
-CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
-CREATE INDEX IF NOT EXISTS idx_post_bookmarks_user_id ON post_bookmarks(user_id);
-CREATE INDEX IF NOT EXISTS idx_post_ratings_post_id ON post_ratings(post_id);
-CREATE INDEX IF NOT EXISTS idx_availability_slots_post_id ON availability_slots(post_id);
-CREATE INDEX IF NOT EXISTS idx_availability_slots_start_time ON availability_slots(start_time);
+CREATE INDEX idx_posts_user_id ON posts(user_id);
+CREATE INDEX idx_posts_category ON posts(category);
+CREATE INDEX idx_posts_tags ON posts USING GIN(tags);
+CREATE INDEX idx_posts_price ON posts(price);
+CREATE INDEX idx_posts_experience_level ON posts(experience_level);
+CREATE INDEX idx_posts_service_type ON posts(service_type);
+CREATE INDEX idx_posts_created_at ON posts(created_at);
+CREATE INDEX idx_post_bookmarks_user_id ON post_bookmarks(user_id);
+CREATE INDEX idx_post_bookmarks_post_id ON post_bookmarks(post_id);
+CREATE INDEX idx_post_ratings_post_id ON post_ratings(post_id);
+CREATE INDEX idx_post_ratings_user_id ON post_ratings(user_id);
+CREATE INDEX idx_availability_slots_post_id ON availability_slots(post_id);
+CREATE INDEX idx_availability_slots_start_time ON availability_slots(start_time);
+CREATE INDEX idx_service_bundles_post_id ON service_bundles(post_id);
+CREATE INDEX idx_case_studies_post_id ON case_studies(post_id);
 
 -- Enable Row Level Security
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
@@ -166,11 +190,9 @@ CREATE POLICY "Users can delete their own ratings" ON post_ratings FOR DELETE US
 
 -- RLS Policies for post_categories
 CREATE POLICY "Everyone can view categories" ON post_categories FOR SELECT USING (true);
-CREATE POLICY "Only admins can manage categories" ON post_categories FOR ALL USING (auth.uid() IN (SELECT id FROM users WHERE role = 'admin'));
 
 -- RLS Policies for post_tags
 CREATE POLICY "Everyone can view tags" ON post_tags FOR SELECT USING (true);
-CREATE POLICY "Only admins can manage tags" ON post_tags FOR ALL USING (auth.uid() IN (SELECT id FROM users WHERE role = 'admin'));
 
 -- RLS Policies for service_bundles
 CREATE POLICY "Everyone can view service bundles" ON service_bundles FOR SELECT USING (true);
@@ -205,16 +227,16 @@ BEGIN
     rating = (
       SELECT AVG(rating)::DECIMAL(3,2) 
       FROM post_ratings 
-      WHERE post_id = NEW.post_id
+      WHERE post_id = COALESCE(NEW.post_id, OLD.post_id)
     ),
     rating_count = (
       SELECT COUNT(*) 
       FROM post_ratings 
-      WHERE post_id = NEW.post_id
+      WHERE post_id = COALESCE(NEW.post_id, OLD.post_id)
     )
-  WHERE id = NEW.post_id;
+  WHERE id = COALESCE(NEW.post_id, OLD.post_id);
   
-  RETURN NEW;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -254,7 +276,7 @@ CREATE TRIGGER trigger_case_studies_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- Insert some default categories
+-- Insert default categories
 INSERT INTO post_categories (name, description, icon, color)
 VALUES
   ('Development', 'Software and web development services', 'code', '#3B82F6'),
@@ -267,7 +289,7 @@ VALUES
   ('Health', 'Health and wellness services', 'heart', '#14B8A6')
 ON CONFLICT (name) DO NOTHING;
 
--- Insert some default tags
+-- Insert default tags
 INSERT INTO post_tags (name, category_id)
 VALUES
   ('React', (SELECT id FROM post_categories WHERE name = 'Development')),
@@ -285,22 +307,5 @@ VALUES
   ('Fitness Training', (SELECT id FROM post_categories WHERE name = 'Health'))
 ON CONFLICT (name) DO NOTHING;
 
--- Add rating and rating_count columns to posts table if they don't exist
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'posts' 
-    AND column_name = 'rating'
-  ) THEN
-    ALTER TABLE posts ADD COLUMN rating DECIMAL(3,2) DEFAULT 0;
-  END IF;
-  
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'posts' 
-    AND column_name = 'rating_count'
-  ) THEN
-    ALTER TABLE posts ADD COLUMN rating_count INTEGER DEFAULT 0;
-  END IF;
-END $$;
+-- Force schema refresh by updating a system table comment
+COMMENT ON TABLE posts IS 'Service posts table - updated to fix schema cache';

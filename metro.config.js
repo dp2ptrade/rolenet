@@ -17,9 +17,15 @@ config.resolver.alias = {
   ...config.resolver.alias,
   'react-native-webrtc': 'react-native-webrtc/lib/index.js',
   'event-target-shim': 'event-target-shim/dist/event-target-shim.js',
+  // Fix React DOM compatibility for React 19
+  'react-dom': 'react-native-web/dist/exports/ReactDOM',
+  'react-dom/client': 'react-native-web/dist/exports/ReactDOM',
 };
 
 // Ensure proper asset resolution
 config.resolver.assetExts.push('db', 'mp3', 'ttf', 'obj', 'png', 'jpg');
+
+// Add resolver configuration for better web compatibility
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
 module.exports = config;
