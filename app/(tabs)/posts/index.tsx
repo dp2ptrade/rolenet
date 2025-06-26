@@ -145,6 +145,20 @@ export default function PostsScreen() {
   
   return (
     <SafeAreaView style={styles.container}>
+<<<<<<< HEAD
+=======
+      <LinearGradient
+        colors={['#3B82F6', '#06B6D4']}
+        style={styles.header}
+      >
+        <Text variant="headlineMedium" style={styles.headerTitle}>
+          Service Posts
+        </Text>
+        <Text variant="bodyMedium" style={styles.headerSubtitle}>
+          Find and offer professional services
+        </Text>
+      </LinearGradient>
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
       
       <View style={styles.content}>
         <PostFilters
@@ -192,12 +206,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+<<<<<<< HEAD
   customHeader: {
     padding: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
+=======
+>>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
   header: {
     padding: 12,
     paddingTop: 12,
@@ -263,5 +280,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#6B7280',
   },
+<<<<<<< HEAD
+});
+=======
 });
 >>>>>>> 05f919e6fe06698506e65aeedb7b1bc62c11c1a7
