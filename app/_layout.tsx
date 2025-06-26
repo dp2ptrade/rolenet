@@ -11,6 +11,9 @@ import { useUserStore } from '../stores/useUserStore';
 import { useAppStateStore } from '../stores/useAppStateStore';
 import IncomingCallModal from '../components/IncomingCallModal';
 import { UserService } from '../lib/supabaseService';
+import AppSidebar from '../components/AppSidebar';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { Drawer } from 'react-native-drawer-layout';
 
 const theme = {
   ...DefaultTheme,
@@ -34,7 +37,6 @@ const theme = {
   },
 };
 
-
 // Initialize upload debugging
 initializeDebugging();
 export default function RootLayout() {
@@ -47,6 +49,7 @@ export default function RootLayout() {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+  
   const {
     incomingCall,
     callStatus,
@@ -62,6 +65,7 @@ export default function RootLayout() {
     callNotificationReceived,
     isInCallBackground 
   } = useAppStateStore();
+  
   const { handleForegroundCall, handleBackgroundCall } = useCallStore();
   const [callerInfo, setCallerInfo] = useState<any>(null);
   
@@ -190,18 +194,47 @@ export default function RootLayout() {
     }
   };
 
+  // Responsive sidebar state
+  const [open, setOpen] = useState(false);
+  const { width } = Dimensions.get('window');
+  const isLargeScreen = width >= 768;
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="auth/signin" />
-          <Stack.Screen name="auth/signup" />
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
+        <Drawer
+          open={open}
+          onOpen={() => setOpen(true)}
+          onClose={() => setOpen(false)}
+          renderDrawerContent={() => <AppSidebar onClose={() => setOpen(false)} />}
+          drawerType={isLargeScreen ? 'permanent' : 'front'}
+          drawerStyle={[
+            styles.drawer,
+            isLargeScreen && styles.permanentDrawer
+          ]}
+        >
+          <View style={styles.mainContent}>
+            <Stack screenOptions={{ 
+              headerShown: false,
+              animation: 'fade',
+            }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="auth/signin" />
+              <Stack.Screen name="auth/signup" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="discover" />
+              <Stack.Screen name="activity" />
+              <Stack.Screen name="chats" />
+              <Stack.Screen name="calls" />
+              <Stack.Screen name="posts" />
+              <Stack.Screen name="friends" />
+              <Stack.Screen name="notifications" />
+              <Stack.Screen name="profile" />
+              <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </View>
+        </Drawer>
         
         {/* Global Incoming Call Modal */}
         {(() => {
@@ -236,3 +269,19 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  drawer: {
+    width: 280,
+    backgroundColor: '#FFFFFF',
+  },
+  permanentDrawer: {
+    width: 280,
+    backgroundColor: '#FFFFFF',
+    borderRightWidth: 1,
+    borderRightColor: '#E5E7EB',
+  },
+  mainContent: {
+    flex: 1,
+  }
+});
