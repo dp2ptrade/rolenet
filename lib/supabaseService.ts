@@ -1,5 +1,4 @@
-
-import { User, Ping, Friend, Call, Chat, Message, Rating } from './types';
+import { User, Ping, Friend, Call, Chat, Message, Rating, Post, PostBookmark, PostRating, ServiceBundle, CaseStudy, AvailabilitySlot } from './types';
 import { supabase } from './supabase';
 import { Session, AuthError } from '@supabase/supabase-js';
 import * as FileSystem from 'expo-file-system';
@@ -935,6 +934,327 @@ export class RatingService {
   }
 }
 
+// Post Service
+export class PostService {
+  static async createPost(postData: Partial<Post>) {
+    const { data, error } = await supabase
+      .from('posts')
+      .insert(postData)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async getPost(postId: string) {
+    const { data, error } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        user:users!user_id(id, name, avatar, role, rating, rating_count),
+        service_bundles:service_bundles(*),
+        case_studies:case_studies(*)
+      `)
+      .eq('id', postId)
+      .single();
+    
+    return { data, error };
+  }
+
+  static async updatePost(postId: string, updates: Partial<Post>) {
+    const { data, error } = await supabase
+      .from('posts')
+      .update(updates)
+      .eq('id', postId)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async deletePost(postId: string) {
+    const { data, error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId);
+    
+    return { data, error };
+  }
+
+  static async getPosts(options: {
+    limit?: number;
+    offset?: number;
+    category?: string;
+    tags?: string[];
+    search?: string;
+    priceMin?: number;
+    priceMax?: number;
+    experienceLevel?: string;
+    serviceType?: string;
+    isRemote?: boolean;
+    minRating?: number;
+    sortBy?: string;
+    userId?: string;
+  } = {}) {
+    let query = supabase
+      .from('posts')
+      .select(`
+        *,
+        user:users!user_id(id, name, avatar, role, rating, rating_count)
+      `);
+    
+    // Apply filters
+    if (options.category) {
+      query = query.eq('category', options.category);
+    }
+    
+    if (options.tags && options.tags.length > 0) {
+      query = query.overlaps('tags', options.tags);
+    }
+    
+    if (options.search) {
+      query = query.or(`title.ilike.%${options.search}%,description.ilike.%${options.search}%,category.ilike.%${options.search}%`);
+    }
+    
+    if (options.priceMin !== undefined) {
+      query = query.gte('price', options.priceMin);
+    }
+    
+    if (options.priceMax !== undefined) {
+      query = query.lte('price', options.priceMax);
+    }
+    
+    if (options.experienceLevel) {
+      query = query.eq('experience_level', options.experienceLevel);
+    }
+    
+    if (options.serviceType) {
+      query = query.eq('service_type', options.serviceType);
+    }
+    
+    if (options.isRemote !== undefined) {
+      query = query.eq('is_remote', options.isRemote);
+    }
+    
+    if (options.minRating !== undefined) {
+      query = query.gte('rating', options.minRating);
+    }
+    
+    if (options.userId) {
+      query = query.eq('user_id', options.userId);
+    }
+    
+    // Apply sorting
+    if (options.sortBy) {
+      switch (options.sortBy) {
+        case 'newest':
+          query = query.order('created_at', { ascending: false });
+          break;
+        case 'oldest':
+          query = query.order('created_at', { ascending: true });
+          break;
+        case 'price_low':
+          query = query.order('price', { ascending: true });
+          break;
+        case 'price_high':
+          query = query.order('price', { ascending: false });
+          break;
+        case 'rating':
+          query = query.order('rating', { ascending: false });
+          break;
+        default:
+          query = query.order('created_at', { ascending: false });
+      }
+    } else {
+      // Default sort by newest
+      query = query.order('created_at', { ascending: false });
+    }
+    
+    // Apply pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+    
+    const { data, error, count } = await query;
+    
+    return { data, error, count };
+  }
+
+  static async getPostCategories() {
+    const { data, error } = await supabase
+      .from('post_categories')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    return { data, error };
+  }
+
+  static async getPostTags(categoryId?: string) {
+    let query = supabase
+      .from('post_tags')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
+    
+    const { data, error } = await query;
+    
+    return { data, error };
+  }
+
+  static async bookmarkPost(userId: string, postId: string) {
+    const { data, error } = await supabase
+      .from('post_bookmarks')
+      .insert({
+        user_id: userId,
+        post_id: postId
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async unbookmarkPost(userId: string, postId: string) {
+    const { data, error } = await supabase
+      .from('post_bookmarks')
+      .delete()
+      .eq('user_id', userId)
+      .eq('post_id', postId);
+    
+    return { data, error };
+  }
+
+  static async getUserBookmarks(userId: string) {
+    const { data, error } = await supabase
+      .from('post_bookmarks')
+      .select(`
+        *,
+        post:posts(
+          *,
+          user:users!user_id(id, name, avatar, role, rating, rating_count)
+        )
+      `)
+      .eq('user_id', userId);
+    
+    return { data, error };
+  }
+
+  static async isPostBookmarked(userId: string, postId: string) {
+    const { data, error } = await supabase
+      .from('post_bookmarks')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('post_id', postId)
+      .single();
+    
+    return { isBookmarked: !!data, error };
+  }
+
+  static async ratePost(userId: string, postId: string, rating: number, comment?: string) {
+    const { data, error } = await supabase
+      .from('post_ratings')
+      .insert({
+        user_id: userId,
+        post_id: postId,
+        rating,
+        comment
+      })
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async getPostRatings(postId: string) {
+    const { data, error } = await supabase
+      .from('post_ratings')
+      .select(`
+        *,
+        user:users!user_id(id, name, avatar, role)
+      `)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: false });
+    
+    return { data, error };
+  }
+
+  static async addServiceBundle(bundle: Partial<ServiceBundle>) {
+    const { data, error } = await supabase
+      .from('service_bundles')
+      .insert(bundle)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async addCaseStudy(caseStudy: Partial<CaseStudy>) {
+    const { data, error } = await supabase
+      .from('case_studies')
+      .insert(caseStudy)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async addAvailabilitySlot(slot: Partial<AvailabilitySlot>) {
+    const { data, error } = await supabase
+      .from('availability_slots')
+      .insert(slot)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async getAvailabilitySlots(postId: string) {
+    const { data, error } = await supabase
+      .from('availability_slots')
+      .select('*')
+      .eq('post_id', postId)
+      .order('start_time', { ascending: true });
+    
+    return { data, error };
+  }
+
+  static async bookAvailabilitySlot(slotId: string, userId: string) {
+    const { data, error } = await supabase
+      .from('availability_slots')
+      .update({
+        is_booked: true,
+        booked_by: userId
+      })
+      .eq('id', slotId)
+      .select()
+      .single();
+    
+    return { data, error };
+  }
+
+  static async incrementPostView(postId: string) {
+    const { data, error } = await supabase.rpc('increment_post_view', {
+      post_id: postId
+    });
+    
+    return { data, error };
+  }
+
+  static async calculateAIMatchScore(userId: string, postId: string) {
+    // This would be a more complex function in a real implementation
+    // For now, we'll return a random score between 50 and 100
+    const score = Math.floor(Math.random() * 51) + 50;
+    return { score };
+  }
+}
+
 // Realtime subscriptions
 export class RealtimeService {
   static subscribeToUserUpdates(userId: string, callback: (payload: any) => void) {
@@ -1033,6 +1353,41 @@ export class RealtimeService {
         schema: 'public',
         table: 'messages',
       }, wrappedCallback)
+      .subscribe();
+  }
+
+  static subscribeToPosts(callback: (payload: any) => void) {
+    return supabase
+      .channel('posts-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'posts',
+      }, callback)
+      .subscribe();
+  }
+
+  static subscribeToUserPosts(userId: string, callback: (payload: any) => void) {
+    return supabase
+      .channel(`user-posts-${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'posts',
+        filter: `user_id=eq.${userId}`,
+      }, callback)
+      .subscribe();
+  }
+
+  static subscribeToPostBookmarks(userId: string, callback: (payload: any) => void) {
+    return supabase
+      .channel(`post-bookmarks-${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'post_bookmarks',
+        filter: `user_id=eq.${userId}`,
+      }, callback)
       .subscribe();
   }
 }
@@ -1246,3 +1601,4 @@ export const chatService = ChatService;
 export const ratingService = RatingService;
 export const realtimeService = RealtimeService;
 export const groupService = GroupService;
+export const postService = PostService;

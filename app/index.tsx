@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useUserStore } from '../stores/useUserStore';
@@ -50,7 +50,7 @@ export default function IndexScreen() {
           if (user) {
             // User is authenticated and has a profile, go to main app
             console.log('🧭 IndexScreen: Navigating to discover (authenticated with profile)');
-            router.replace('/(tabs)/discover');
+            router.replace('/discover');
           } else {
             // User is authenticated but needs to complete onboarding
             console.log('🧭 IndexScreen: Navigating to onboarding (authenticated without profile)');
@@ -74,30 +74,15 @@ export default function IndexScreen() {
     return (
       <LinearGradient
         colors={['#3B82F6', '#06B6D4']}
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
+        style={styles.container}
       >
-        <View style={{ alignItems: 'center' }}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="white" />
-          <Text style={{
-            color: 'white',
-            fontSize: 18,
-            marginTop: 20,
-            fontWeight: '600',
-          }}>
+          <Text style={styles.loadingText}>
             {error ? 'Error loading app...' : 'Initializing RoleNet...'}
           </Text>
           {error && (
-            <Text style={{
-              color: 'rgba(255,255,255,0.8)',
-              fontSize: 14,
-              marginTop: 10,
-              textAlign: 'center',
-              paddingHorizontal: 20,
-            }}>
+            <Text style={styles.errorText}>
               {error}
             </Text>
           )}
@@ -110,3 +95,27 @@ export default function IndexScreen() {
   // The loading UI is handled above
   return null;
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
+    marginTop: 20,
+    fontWeight: '600',
+  },
+  errorText: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  }
+});
