@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { initializeDebugging } from 'debug.config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,9 +12,7 @@ import { useUserStore } from '../stores/useUserStore';
 import { useAppStateStore } from '../stores/useAppStateStore';
 import IncomingCallModal from '../components/IncomingCallModal';
 import { UserService } from '../lib/supabaseService';
-import AppSidebar from '../components/AppSidebar';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
-import { Drawer } from 'react-native-drawer-layout';
+import { View, StyleSheet, Platform } from 'react-native';
 import TabLayout from './(tabs)/_layout';
 import { isWeb } from '../utils/platform';
 
@@ -46,10 +45,23 @@ export default function RootLayout() {
   
   const currentUser = useUserStore((state: any) => state.user);
   const initializeAuth = useUserStore((state: any) => state.initializeAuth);
+  const [initialTab, setInitialTab] = useState<string | null>(null);
   
   // Initialize authentication on app load
   useEffect(() => {
     initializeAuth();
+    // Load the last active tab from storage
+    const loadInitialTab = async () => {
+      try {
+        const savedTab = await AsyncStorage.getItem('lastActiveTab');
+        if (savedTab) {
+          setInitialTab(savedTab);
+        }
+      } catch (error) {
+        console.error('Failed to load initial tab:', error);
+      }
+    };
+    loadInitialTab();
   }, [initializeAuth]);
   
   const {
@@ -196,64 +208,23 @@ export default function RootLayout() {
     }
   };
 
-  // Responsive sidebar state
-  const [open, setOpen] = useState(false);
-  const { width } = Dimensions.get('window');
-  const isLargeScreen = width >= 768;
-
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
-        {isWeb ? (
-          <View style={styles.mainContent}>
-            <Stack screenOptions={{ 
-              headerShown: false,
-              animation: 'fade',
-            }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="auth/signin" />
-              <Stack.Screen name="auth/signup" />
-              <Stack.Screen name="onboarding" />
-              <Stack.Screen name="(tabs)/discover" redirect={true} />
-              <Stack.Screen name="(tabs)/activity" redirect={true} />
-              <Stack.Screen name="(tabs)/chats" redirect={true} />
-              <Stack.Screen name="(tabs)/calls" redirect={true} />
-              <Stack.Screen name="(tabs)/posts" redirect={true} />
-              <Stack.Screen name="(tabs)/friends" redirect={true} />
-              <Stack.Screen name="(tabs)/notifications" redirect={true} />
-              <Stack.Screen name="(tabs)/profile" redirect={true} />
-              <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-          </View>
-        ) : (
-          <Drawer
-            open={open}
-            onOpen={() => setOpen(true)}
-            onClose={() => setOpen(false)}
-            renderDrawerContent={() => <AppSidebar onClose={() => setOpen(false)} />}
-            drawerType={isLargeScreen ? 'permanent' : 'front'}
-            drawerStyle={[
-              styles.drawer,
-              isLargeScreen && styles.permanentDrawer
-            ]}
-          >
-            <View style={styles.mainContent}>
-              <Stack screenOptions={{ 
-                headerShown: false,
-                animation: 'fade',
-              }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="auth/signin" />
-                <Stack.Screen name="auth/signup" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-            </View>
-          </Drawer>
-        )}
+        <View style={styles.mainContent}>
+          <Stack screenOptions={{ 
+            headerShown: false,
+            animation: 'fade',
+          }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="auth/signin" />
+            <Stack.Screen name="auth/signup" />
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="call" options={{ presentation: 'fullScreenModal' }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+        </View>
         
         {/* Global Incoming Call Modal */}
         {(() => {
@@ -290,16 +261,6 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  drawer: {
-    width: 280,
-    backgroundColor: '#FFFFFF',
-  },
-  permanentDrawer: {
-    width: 280,
-    backgroundColor: '#FFFFFF',
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-  },
   mainContent: {
     flex: 1,
   }

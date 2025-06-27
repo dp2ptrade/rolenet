@@ -37,14 +37,14 @@ export default function EditPostScreen() {
   };
   
   const handleCancel = () => {
-    router.back();
+    router.replace('/posts');
   };
   
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <Appbar.Header style={styles.header}>
-          <Appbar.BackAction onPress={() => router.back()} />
+          <Appbar.BackAction onPress={() => router.replace('/posts')} />
           <Appbar.Content title="Edit Post" />
         </Appbar.Header>
         <View style={styles.loadingContainer}>
@@ -59,7 +59,7 @@ export default function EditPostScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Appbar.Header style={styles.header}>
-          <Appbar.BackAction onPress={() => router.back()} />
+          <Appbar.BackAction onPress={() => router.replace('/posts')} />
           <Appbar.Content title="Edit Post" />
         </Appbar.Header>
         <View style={styles.errorContainer}>
@@ -73,7 +73,7 @@ export default function EditPostScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <Appbar.Header style={styles.header}>
-          <Appbar.BackAction onPress={() => router.back()} />
+          <Appbar.BackAction onPress={() => router.replace('/posts')} />
           <Appbar.Content title="Edit Post" />
         </Appbar.Header>
         <View style={styles.errorContainer}>
@@ -86,7 +86,7 @@ export default function EditPostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Appbar.Header style={styles.header}>
-        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.BackAction onPress={() => router.replace('/posts')} />
         <Appbar.Content title="Edit Post" />
       </Appbar.Header>
       

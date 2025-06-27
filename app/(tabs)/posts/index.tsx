@@ -44,6 +44,7 @@ export default function PostsScreen() {
   
   // Refresh posts when filters change
   useEffect(() => {
+    usePostStore.setState({ currentPage: 1 });
     loadPosts();
   }, [
     searchQuery,
@@ -98,10 +99,12 @@ export default function PostsScreen() {
   };
   
   const handleApplyFilters = () => {
+    usePostStore.setState({ currentPage: 1 });
     loadPosts();
   };
   
   const handleResetFilters = () => {
+    usePostStore.setState({ currentPage: 1 });
     loadPosts();
   };
   
@@ -193,15 +196,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   customHeader: {
-    padding: 10,
+    padding: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
   },
   header: {
-    padding: 12,
-    paddingTop: 12,
-    paddingBottom: 16,
+    padding: 2,
+    paddingTop: 2,
+    paddingBottom: 2,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',

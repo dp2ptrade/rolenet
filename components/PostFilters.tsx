@@ -223,42 +223,17 @@ const PostFilters: React.FC<PostFiltersProps> = ({
         </ScrollView>
       )}
       
-      {/* Sort options */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.sortOptionsContainer}
-        contentContainerStyle={styles.sortOptionsContent}
-      >
-        <Chip
-          selected={sortBy === 'newest'}
-          onPress={() => setSortBy('newest')}
-          style={styles.sortChip}
-        >
-          Newest
-        </Chip>
-        <Chip
-          selected={sortBy === 'price_low'}
-          onPress={() => setSortBy('price_low')}
-          style={styles.sortChip}
-        >
-          Price: Low to High
-        </Chip>
-        <Chip
-          selected={sortBy === 'price_high'}
-          onPress={() => setSortBy('price_high')}
-          style={styles.sortChip}
-        >
-          Price: High to Low
-        </Chip>
-        <Chip
-          selected={sortBy === 'rating'}
-          onPress={() => setSortBy('rating')}
-          style={styles.sortChip}
-        >
-          Top Rated
-        </Chip>
-      </ScrollView>
+      {/* Sort options as Tab Bar */}
+      <View style={styles.tabContainer}>
+        <Surface style={styles.tabBar} elevation={4}>
+          <TabSelector 
+            tabs={['newest', 'price_low', 'price_high', 'rating']} 
+            selectedTab={sortBy} 
+            onSelectTab={setSortBy} 
+            labels={['Newest', 'Price: Low to High', 'Price: High to Low', 'Top Rated']} 
+          />
+        </Surface>
+      </View>
       
       {/* Filters Modal */}
       <Portal>
@@ -492,26 +467,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   activeFiltersContainer: {
-    marginBottom: 12,
+    marginBottom: 10,
+    height: 40, // Fixed height to ensure full visibility of chips
   },
   activeFiltersContent: {
     paddingHorizontal: 16,
+    alignItems: 'center', // Center vertically to prevent clipping
   },
   activeFilterChip: {
     marginRight: 8,
     backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+    paddingHorizontal: 10,
+    height: 32, // Fixed height for chips to ensure text fits
   },
   clearAllChip: {
     backgroundColor: '#FEE2E2',
+    paddingHorizontal: 12,
+    minWidth: 100,
   },
-  sortOptionsContainer: {
-    marginBottom: 16,
-  },
-  sortOptionsContent: {
+  tabContainer: {
+    marginBottom: 10,
     paddingHorizontal: 16,
+    zIndex: 0,
   },
-  sortChip: {
-    marginRight: 8,
+  tabBar: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    height: 50,
+    overflow: 'hidden',
+  },
+  tabSelectorContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    height: 42,
+    position: 'relative',
+  },
+  tabItem: {
+    flex: 1,
+    height: 42,
+  },
+  tabItemContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  tabText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#4B5563',
+    textAlign: 'center',
+  },
+  selectedTabText: {
+    color: '#1E40AF',
+    fontWeight: 'bold',
   },
   modalContainer: {
     padding: 20,
@@ -620,7 +641,121 @@ const styles = StyleSheet.create({
   },
 });
 
-// Import TouchableOpacity
-import { TouchableOpacity } from 'react-native';
+// Import TouchableOpacity and Animated components
+import { TouchableOpacity, Pressable } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+
+// Custom animated tab selector component
+interface TabSelectorProps {
+  tabs: string[];
+  selectedTab: string;
+  onSelectTab: (tab: string) => void;
+  labels: string[];
+}
+
+function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProps) {
+  // Create animated values for the indicator
+  const indicatorPosition = useSharedValue(0);
+  const indicatorWidth = useSharedValue(0);
+  
+  // References to measure tab widths
+  const tabRefs = React.useRef<React.RefObject<View | null>[]>(tabs.map(() => React.createRef<View>()));
+  const tabWidths = React.useRef<number[]>(tabs.map(() => 0));
+  const tabPositions = React.useRef<number[]>(tabs.map(() => 0));
+  const isLayoutCalculated = React.useRef<boolean>(false);
+  
+  // Update indicator position when tab changes
+  React.useEffect(() => {
+    if (isLayoutCalculated.current) {
+      const index = tabs.indexOf(selectedTab);
+      if (index !== -1) {
+        indicatorPosition.value = withTiming(tabPositions.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+        indicatorWidth.value = withTiming(tabWidths.current[index], {
+          duration: 300,
+          easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+        });
+      }
+    }
+  }, [selectedTab, indicatorPosition, indicatorWidth]);
+
+  // Function to handle layout calculation
+  const handleTabLayout = (index: number) => (event: any) => {
+    const { width, x } = event.nativeEvent.layout;
+    tabWidths.current[index] = width;
+    tabPositions.current[index] = x;
+    // Check if all tabs have been measured
+    if (tabWidths.current.every(w => w > 0)) {
+      isLayoutCalculated.current = true;
+      // Initialize indicator position for the selected tab
+      const selectedIndex = tabs.indexOf(selectedTab);
+      if (selectedIndex !== -1) {
+        indicatorPosition.value = tabPositions.current[selectedIndex];
+        indicatorWidth.value = tabWidths.current[selectedIndex];
+      }
+    }
+  };
+  
+  // Animated style for the indicator
+  const indicatorStyle = useAnimatedStyle(() => {
+    return {
+      position: 'absolute',
+      bottom: 0,
+      left: indicatorPosition.value,
+      width: indicatorWidth.value,
+      height: 3,
+      backgroundColor: '#38BDF8',
+      borderRadius: 1.5,
+    };
+  });
+  
+  return (
+    <View style={styles.tabSelectorContainer}>
+      {tabs.map((tab: string, index: number) => {
+        const isSelected = tab === selectedTab;
+        
+        // Create animated styles for each tab
+        const tabAnimatedStyle = useAnimatedStyle(() => {
+          return {
+            opacity: withTiming(isSelected ? 1 : 0.7, { duration: 200 }),
+            transform: [
+              { 
+                scale: withTiming(isSelected ? 1.05 : 1, { 
+                  duration: 200,
+                  easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+                })
+              }
+            ],
+          };
+        });
+        
+        return (
+          <Pressable
+            key={tab}
+            ref={tabRefs.current[index]}
+            style={styles.tabItem}
+            onLayout={handleTabLayout(index)}
+            onPress={() => {
+              if (tab !== selectedTab) {
+                onSelectTab(tab);
+              }
+            }}
+          >
+            <Animated.View style={[styles.tabItemContent, tabAnimatedStyle]}>
+              <Text 
+                style={[styles.tabText, isSelected && styles.selectedTabText]}
+              >
+                {labels[index]}
+              </Text>
+            </Animated.View>
+          </Pressable>
+        );
+      })}
+      <Animated.View style={indicatorStyle} />
+    </View>
+  );
+}
 
 export default PostFilters;

@@ -171,7 +171,7 @@ export default function PostDetailScreen() {
           <IconButton
             icon={({ size, color }) => <ChevronLeft size={size} color={color} />}
             size={24}
-            onPress={() => router.back()}
+            onPress={() => router.push('/posts')}
             style={styles.backButton}
           />
           

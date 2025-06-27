@@ -83,6 +83,15 @@ export default function BookmarkedPostsScreen() {
   
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <IconButton
+          icon={({ size, color }) => <ChevronLeft size={size} color={color} />}
+          size={24}
+          onPress={() => router.push('/posts')}
+          style={styles.backButton}
+        />
+        <Text style={styles.headerTitle}>Bookmarked Posts</Text>
+      </View>
       <FlatList
         data={bookmarkedPosts}
         renderItem={renderItem}
@@ -106,11 +115,30 @@ export default function BookmarkedPostsScreen() {
 }
 
 import { router } from 'expo-router';
+import { IconButton } from 'react-native-paper';
+import { ChevronLeft } from 'lucide-react-native';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  backButton: {
+    marginRight: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
   },
   listContent: {
     padding: 16,

@@ -14,9 +14,9 @@
 // Debug configuration
 export const DEBUG_CONFIG = {
   // Enable detailed logging
-  enableNetworkDebugging: true,
-  enableUploadTesting: true,
-  enableRetryMechanism: true,
+  enableNetworkDebugging: false,
+  enableUploadTesting: false,
+  enableRetryMechanism: false,
   
   // Logging levels
   logLevel: 'verbose', // 'minimal', 'normal', 'verbose'

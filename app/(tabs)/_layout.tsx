@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, Activity, Users, User, Bell, MessageCircle, Phone, FileText } from 'lucide-react-native';
 import { useTheme, Badge } from 'react-native-paper';
 import { useNotificationStore } from '@/stores/useNotificationStore';
@@ -9,9 +10,25 @@ import { getPlatformStyles, isWeb } from '@/utils/platform';
 
 export default function TabLayout() {
   const theme = useTheme();
-  
+  const [initialRoute, setInitialRoute] = useState<string>('discover');
+
+  useEffect(() => {
+    const loadInitialTab = async () => {
+      try {
+        const savedTab = await AsyncStorage.getItem('lastActiveTab');
+        if (savedTab) {
+          setInitialRoute(savedTab);
+        }
+      } catch (error) {
+        console.error('Failed to load initial tab:', error);
+      }
+    };
+    loadInitialTab();
+  }, []);
+
   return (
     <Tabs
+      initialRouteName={initialRoute}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -25,15 +42,22 @@ export default function TabLayout() {
           height: 60,
           ...getPlatformStyles({
             web: {
-              marginHorizontal: 20,
+              marginHorizontal: 10,
               marginBottom: 10,
               paddingBottom: 1,
               borderRadius: 10,
-              maxWidth: 800,
               marginLeft: 'auto',
               marginRight: 'auto',
             }
           }),
+        },
+      }}
+      screenListeners={{
+        state: (e) => {
+          const currentRoute = e.data.state.routes[e.data.state.index].name;
+          AsyncStorage.setItem('lastActiveTab', currentRoute).catch(error => {
+            console.error('Failed to save active tab:', error);
+          });
         },
       }}
     >
