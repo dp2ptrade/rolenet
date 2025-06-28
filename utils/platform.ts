@@ -84,6 +84,62 @@ export const getElevationStyle = (elevation: number) => {
 export const supportsNativeDriver = !isWeb;
 
 /**
+ * Responsive breakpoints
+ */
+export const BREAKPOINTS = {
+  SMALL: 375,
+  MEDIUM: 768,
+  LARGE: 1024,
+  EXTRA_LARGE: 1440,
+} as const;
+
+/**
+ * Get responsive breakpoint information
+ */
+export const getBreakpointInfo = (width: number) => ({
+  isSmall: width < BREAKPOINTS.SMALL,
+  isMobile: width < BREAKPOINTS.MEDIUM,
+  isTablet: width >= BREAKPOINTS.MEDIUM && width < BREAKPOINTS.LARGE,
+  isDesktop: width >= BREAKPOINTS.LARGE,
+  isLargeDesktop: width >= BREAKPOINTS.EXTRA_LARGE,
+});
+
+/**
+ * Get responsive value based on screen width
+ */
+export const getResponsiveValue = <T>(
+  width: number,
+  values: {
+    small?: T;
+    mobile?: T;
+    tablet?: T;
+    desktop?: T;
+    largeDesktop?: T;
+    default: T;
+  }
+): T => {
+  const breakpoints = getBreakpointInfo(width);
+  
+  if (breakpoints.isLargeDesktop && values.largeDesktop !== undefined) {
+    return values.largeDesktop;
+  }
+  if (breakpoints.isDesktop && values.desktop !== undefined) {
+    return values.desktop;
+  }
+  if (breakpoints.isTablet && values.tablet !== undefined) {
+    return values.tablet;
+  }
+  if (breakpoints.isMobile && values.mobile !== undefined) {
+    return values.mobile;
+  }
+  if (breakpoints.isSmall && values.small !== undefined) {
+    return values.small;
+  }
+  
+  return values.default;
+};
+
+/**
  * Get platform-specific haptic feedback
  * Note: Import expo-haptics in the component that uses this function
  */

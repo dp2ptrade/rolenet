@@ -12,6 +12,14 @@
         "gradleCommand": ":app:assembleDevelopmentDebug"
       }
     },
+    "local": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "android": {

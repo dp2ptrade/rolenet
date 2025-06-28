@@ -1,12 +1,45 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { Text, FAB, Snackbar } from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { usePostStore } from '@/stores/usePostStore';
+import { useUserStore } from '@/stores/useUserStore';
+import PostCard from '@/components/PostCard';
+import PostFilters from '@/components/PostFilters';
+import { Post } from '@/lib/types';
+import { FileText, Plus } from 'lucide-react-native';
 
-export default function PostsTab() {
+export default function PostsScreen() {
+  const { 
+    posts, 
+    isLoading, 
+    error, 
+    loadPosts, 
+    loadMorePosts,
+    hasMore,
+    searchQuery,
+    selectedCategory,
+    selectedTags,
+    priceRange,
+    experienceLevel,
+    serviceType,
+    isRemoteOnly,
+    minRating,
+    sortBy
+  } = usePostStore();
+  
+  const { user } = useUserStore();
+  
+  const [refreshing, setRefreshing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  
+  // Load posts on mount
   useEffect(() => {
-    // Redirect to the main posts screen
-    router.replace('/posts');
+    loadPosts();
   }, []);
   
   // Refresh posts when filters change
@@ -114,9 +147,46 @@ export default function PostsTab() {
   );
   
   return (
-    <View style={styles.container}>
-      <Text>Redirecting to Posts...</Text>
-    </View>
+    <SafeAreaView style={styles.container}>
+      
+      <View style={styles.content}>
+        <PostFilters
+          onApplyFilters={handleApplyFilters}
+          onResetFilters={handleResetFilters}
+          showModal={showFilters}
+          setShowModal={setShowFilters}
+        />
+        
+        <FlatList
+          data={posts}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={!isLoading ? renderEmpty : null}
+        />
+      </View>
+      
+      <FAB
+        icon={({ size, color }) => <Plus size={size} color={color} />}
+        style={styles.fab}
+        onPress={handleCreatePost}
+        label="Create Post"
+      />
+      
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+      >
+        {snackbarMessage}
+      </Snackbar>
+    </SafeAreaView>
   );
 }
 
@@ -174,5 +244,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
+  },
+  footerText: {
+    marginLeft: 8,
+    color: '#6B7280',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    marginTop: 32,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    textAlign: 'center',
+    color: '#6B7280',
   },
 });
