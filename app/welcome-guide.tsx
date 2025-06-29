@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Image, Dimensions, Platform, TouchableOpacity, Linking, Easing } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Dimensions, Platform, TouchableOpacity, Linking, Easing, Animated } from 'react-native';
 import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
@@ -10,11 +10,15 @@ import { ASSETS } from '../constants/assets';
 import { COLORS, TYPOGRAPHY, SPACING, DIMENSIONS, ANIMATIONS } from '../constants/theme';
 import { getAnimationConfig } from '../utils/platform';
 import TechPartners from '../components/TechPartners';
+import { useState } from 'react';
+import { VoiceSearchService } from '../lib/voiceSearch';
 
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeGuideScreen() {
-  const insets = useRef(new Animated.Value(0)).current;
+  const rotateValue = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
   const scaleValue = useRef(new Animated.Value(1)).current;
   const [isPressed, setIsPressed] = useState(false);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -26,40 +30,52 @@ export default function WelcomeGuideScreen() {
       voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
 
+    // Initialize fade animation
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+
+    // Initialize scale animation
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+
     let animationTimeout: any;
   
-  // Start the rotation animation
-  const startRotation = () => {
-    rotateValue.setValue(0);
-    const animation = Animated.timing(rotateValue, {
-      toValue: 1,
-      duration: 3000, // 3 seconds for one full rotation
-      useNativeDriver: false,
-    });
-    animationRef.current = animation;
-    animation.start(({ finished }) => {
-      if (finished && !isPressed) {
-        // Wait 5 seconds before starting the next rotation
-        animationTimeout = setTimeout(() => {
-          startRotation(); // Loop the animation only if not pressed
-        }, 5000);
+    // Start the rotation animation
+    const startRotation = () => {
+      rotateValue.setValue(0);
+      const animation = Animated.timing(rotateValue, {
+        toValue: 1,
+        duration: 3000, // 3 seconds for one full rotation
+        useNativeDriver: false,
+      });
+      animationRef.current = animation;
+      animation.start(({ finished }) => {
+        if (finished && !isPressed) {
+          // Wait 5 seconds before starting the next rotation
+          animationTimeout = setTimeout(() => {
+            startRotation(); // Loop the animation only if not pressed
+          }, 5000);
+        }
+      });
+    };
+    startRotation();
+  
+    return () => {
+      if (animationRef.current) {
+        animationRef.current.stop();
       }
-    });
-  };
-  startRotation();
-  
-  loadUsers();
-  
-  return () => {
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-    if (animationTimeout) {
-      clearTimeout(animationTimeout);
-    }
-  };
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+      if (animationTimeout) {
+        clearTimeout(animationTimeout);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Handle press interactions for the logo
   const handlePressIn = () => {
@@ -516,8 +532,3 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
 });
-
-// Import necessary components
-import Animated from 'react-native-reanimated';
-import { useState } from 'react';
-import { VoiceSearchService } from '../lib/voiceSearch';
