@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { usePostStore } from '@/stores/usePostStore';
 import { useUserStore } from '@/stores/useUserStore';
+import { useResponsive } from '@/hooks/useResponsive';
 import PostCard from '@/components/PostCard';
 import PostFilters from '@/components/PostFilters';
 import { Post } from '@/lib/types';
@@ -146,9 +147,10 @@ export default function PostsScreen() {
     </View>
   );
   
+  const { responsive } = useResponsive();
+
   return (
     <SafeAreaView style={styles.container}>
-      
       <View style={styles.content}>
         <PostFilters
           onApplyFilters={handleApplyFilters}
@@ -161,7 +163,7 @@ export default function PostsScreen() {
           data={posts}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: responsive.isTablet ? 70 : 60 }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -176,7 +178,7 @@ export default function PostsScreen() {
         icon={({ size, color }) => <Plus size={size} color={color} />}
         style={styles.fab}
         onPress={handleCreatePost}
-        label="Create Post"
+        small
       />
       
       <Snackbar
@@ -202,9 +204,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   header: {
-    padding: 2,
+    padding: 0,
     paddingTop: 2,
-    paddingBottom: 2,
+    paddingBottom: 0,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -218,7 +220,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   headerSubtitle: {
@@ -227,6 +229,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingBottom: 0, // Adjusted to ensure content is not obscured by bottom navigation bar
   },
   listContent: {
     padding: 16,
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#38BDF8',
   },
   footerLoader: {
     flexDirection: 'row',

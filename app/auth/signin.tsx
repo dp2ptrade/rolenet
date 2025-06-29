@@ -144,6 +144,7 @@ export default function SignInScreen() {
                 loading={isLoading}
                 disabled={isLoading}
                 style={{ marginBottom: 20, paddingVertical: 8 }}
+                color="#38BDF9"
               >
                 Sign In
               </Button>

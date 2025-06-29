@@ -459,6 +459,7 @@ const styles = StyleSheet.create({
     elevation: 0,
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
+    height: 40, // Reduced height for smaller search bar
   },
   filterButton: {
     backgroundColor: '#3B82F6',

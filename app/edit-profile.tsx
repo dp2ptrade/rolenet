@@ -14,6 +14,7 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user?.name || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [role, setRole] = useState(user?.role || '');
+  const [location, setLocation] = useState(user?.location?.address || '');
   const [tags, setTags] = useState<string[]>(user?.tags || []);
   const [avatar, setAvatar] = useState(user?.avatar || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -21,7 +22,7 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const updates = { name, bio, role, tags, avatar };
+      const updates = { name, bio, role, location: { address: location, latitude: 0, longitude: 0 }, tags, avatar };
       const { data, error } = await UserService.updateUserProfile(user!.id, updates);
       if (error) {
         Alert.alert('Error', 'Failed to update profile.');
@@ -48,41 +49,95 @@ export default function EditProfileScreen() {
 
     // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: "images",
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
     });
 
-    if (!result.canceled && result.assets.length > 0) {
+      if (!result.canceled && result.assets.length > 0) {
       const selectedImage = result.assets[0];
-      const fileExt = selectedImage.uri.split('.').pop();
+      const fileExt = selectedImage.uri.split('.').pop() || 'jpg'; // Default to jpg if no extension
       const fileName = `${user!.id}-avatar.${fileExt}`;
       const filePath = `${user!.id}/${fileName}`;
 
-      // Upload image to Supabase storage
-      try {
-        let uploadData: any;
-        // Check if running on web or native
-        if (selectedImage.uri.startsWith('data:') || !selectedImage.uri.startsWith('file://')) {
-          // For web or non-file URIs, fetch and convert to Blob
-          const response = await fetch(selectedImage.uri);
-          const blob = await response.blob();
-          uploadData = blob;
-        } else {
-          // For native file URIs, use FormData
-          const formData = new FormData();
-          formData.append('file', {
-            uri: selectedImage.uri,
-            name: fileName,
-            type: `image/${fileExt}`,
-          } as any);
-          uploadData = formData;
-        }
+        // Upload image to Supabase storage
+        try {
+          let uploadData: any;
+          // Check if running on web or native
+          if (selectedImage.uri.startsWith('data:')) {
+            // For data URIs (base64), convert directly to Blob without fetching
+            try {
+              const base64Data = selectedImage.uri.split(',')[1];
+              console.log('Base64 data length:', base64Data.length);
+              const byteCharacters = atob(base64Data);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: `image/${fileExt}` });
+              console.log('Blob size:', blob.size);
+              uploadData = blob;
+            } catch (error) {
+              console.error('Base64 to Blob conversion error:', error);
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              throw new Error(`Failed to convert base64 data to Blob: ${errorMessage}`);
+            }
+          } else if (!selectedImage.uri.startsWith('file://')) {
+            // For other non-file URIs, attempt to fetch and convert to Blob
+            try {
+              const response = await fetch(selectedImage.uri);
+              if (!response.ok) {
+                throw new Error(`Fetch failed with status ${response.status}: ${response.statusText}`);
+              }
+              const blob = await response.blob();
+              console.log('Fetched Blob size:', blob.size);
+              uploadData = blob;
+            } catch (fetchError) {
+              console.error('Fetch error:', fetchError);
+              const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+              throw new Error(`Failed to fetch image data: ${errorMessage}`);
+            }
+          } else {
+            // For native file URIs, use FormData
+            const formData = new FormData();
+            formData.append('file', {
+              uri: selectedImage.uri,
+              name: fileName,
+              type: `image/${fileExt}`,
+            } as any);
+            uploadData = formData;
+          }
 
-        const { data, error } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, uploadData, { upsert: true });
+          console.log('Starting upload to Supabase storage...');
+          let uploadAttempts = 0;
+          let data, error;
+          const maxRetries = 3;
+          
+          while (uploadAttempts < maxRetries) {
+            uploadAttempts++;
+            console.log(`Upload attempt ${uploadAttempts} of ${maxRetries}...`);
+            const result = await supabase.storage
+              .from('avatars')
+              .upload(filePath, uploadData, { upsert: true, contentType: `image/${fileExt}` });
+            
+            data = result.data;
+            error = result.error;
+            
+            if (!error) {
+              console.log('Upload successful on attempt', uploadAttempts, 'Data:', data);
+              break;
+            } else {
+              console.log('Upload failed on attempt', uploadAttempts, 'Error:', error);
+              if (uploadAttempts < maxRetries) {
+                console.log('Retrying upload...');
+                // Wait for a short delay before retrying
+                await new Promise(resolve => setTimeout(resolve, 2000 * uploadAttempts));
+              }
+            }
+          }
+          console.log('Upload process completed. Data:', data, 'Error:', error);
 
         if (error) {
           throw new Error(`Upload error: ${error.message || 'Unknown error'}`);
@@ -99,7 +154,7 @@ export default function EditProfileScreen() {
         const { error: updateError } = await UserService.updateUserProfile(user!.id, { avatar: newAvatarUrl });
         if (updateError) {
           Alert.alert('Error', 'Failed to update avatar in profile. Please save changes manually.');
-          console.error('Error updating avatar in profile:', updateError);
+          console.error('Error updating avatar in profile:', updateError.message || updateError);
         } else {
           setCurrentUser({ ...user!, avatar: newAvatarUrl });
           Alert.alert('Success', 'Avatar updated successfully!');
@@ -107,7 +162,7 @@ export default function EditProfileScreen() {
       } catch (error) {
         console.error('Error uploading avatar:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        Alert.alert('Error', `Failed to upload avatar: ${errorMessage}. Please try again.`);
+        Alert.alert('Error', `Failed to upload avatar: ${errorMessage}. Please try again. Detailed error logged to console.`);
       }
     }
   };
@@ -150,6 +205,12 @@ export default function EditProfileScreen() {
           label="Role"
           value={role}
           onChangeText={setRole}
+          style={styles.input}
+        />
+        <TextInput
+          label="Location"
+          value={location}
+          onChangeText={setLocation}
           style={styles.input}
         />
         <Text style={styles.sectionTitle}>Tags</Text>

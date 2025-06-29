@@ -56,15 +56,16 @@ export default function TabLayout() {
   };
 
   const getIconSize = () => {
-    if (isSmallScreen) return 20;
-    if (isTablet) return 26;
+    if (isSmallScreen) return 22;
+    if (isTablet) return 28;
     if (isDesktop) return 24;
-    return 22;
+    return Platform.OS === 'android' ? 26 : 24;
   };
 
   const getPaddingBottom = () => {
     if (isWeb) return 8;
-    return Math.max(8, insets.bottom / 2);
+    // Use full bottom inset plus a larger offset on Android to position tab bar higher above system navigation
+    return Platform.OS === 'android' ? insets.bottom + 48 : Math.max(8, insets.bottom / 2);
   };
 
   return (
@@ -74,25 +75,28 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
-        tabBarShowLabel: isTablet || isDesktop,
+        tabBarShowLabel: isTablet || isDesktop || isLandscape,
         tabBarLabelStyle: {
-          fontSize: isDesktop ? 12 : isTablet ? 11 : 10,
-          fontWeight: '500',
-          marginTop: 2,
+          fontSize: isDesktop ? 12 : isTablet ? 11 : 9,
+          fontWeight: '600',
+          marginTop: 4,
         },
         tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.outline,
-          borderTopWidth: 0.5,
+          backgroundColor: theme.colors.background,
+          borderTopColor: 'transparent',
+          borderTopWidth: 0,
           paddingBottom: getPaddingBottom(),
-          paddingTop: 8,
-          paddingHorizontal: isTablet ? 16 : 8,
-          height: getTabBarHeight(),
+          paddingTop: isSmallScreen ? 4 : 6,
+          paddingHorizontal: isTablet ? 16 : 6,
+          height: getTabBarHeight() + (isSmallScreen ? 0 : 10),
           elevation: isWeb ? 0 : 8,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.1,
-          shadowRadius: 8,
+          shadowRadius: 5,
+          borderTopLeftRadius: isWeb ? 0 : 10,
+          borderTopRightRadius: isWeb ? 0 : 10,
+          overflow: 'hidden',
           ...getPlatformStyles({
             web: {
               marginHorizontal: isDesktop ? 20 : isTablet ? 15 : 10,
@@ -108,16 +112,24 @@ export default function TabLayout() {
               borderTopWidth: 0,
             },
             android: {
-              elevation: 12,
+              elevation: 20,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -6 },
+              shadowOpacity: 0.25,
+              shadowRadius: 15,
             }
           }),
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
-          minHeight: 48, // Ensure minimum touch target
+          paddingVertical: 6,
+          minHeight: 50, // Larger touch target for better UX
           justifyContent: 'center',
           alignItems: 'center',
+          borderRadius: 12,
+          marginHorizontal: isSmallScreen ? 2 : 4,
+          position: 'relative',
         },
+        tabBarActiveBackgroundColor: theme.colors.primaryContainer,
       }}
       screenListeners={{
         state: (e) => {

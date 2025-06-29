@@ -10,10 +10,12 @@ import { useFriendStore } from '../../stores/useFriendStore';
 import { Chat } from '@/lib/types';
 import { ChatItem } from '../../components/ChatItem';
 import { CreateGroupDialog } from '../../components/CreateGroupDialog';
+import { supabase } from '../../lib/supabase';
 
 export default function ChatsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'recent' | 'groups'>('recent');
+  const [temporaryUsers, setTemporaryUsers] = useState<{ id: string; name: string; avatar: string }[]>([]);
   const { user } = useUserStore();
   const { chats, loadUserChats, isLoading, subscribeToAllChats, unsubscribeFromAllChats, initializeOfflineSupport } = useChatStore();
   const { friends } = useFriendStore();
@@ -52,6 +54,7 @@ export default function ChatsScreen() {
   // Group one-on-one chats by the other participant
   const groupedChats: { [key: string]: Chat[] } = {};
   const groupChats: Chat[] = [];
+  const unknownUserIds: string[] = [];
 
   console.log('🔍 Processing all chats:', {
     totalChats: chats.length,
@@ -65,15 +68,21 @@ export default function ChatsScreen() {
     }))
   });
 
+  // Debug friends data to check if friends are loaded
+  console.log('👥 Friends loaded:', {
+    totalFriends: friends.length,
+    friendIds: friends.map(f => f.id)
+  });
+
   chats.forEach(chat => {
     // Use is_group field to determine if it's a group chat
     if (chat.is_group || chat.participants.length > 2) {
-      // Only include groups where the user is a participant
-      if (chat.participants.includes(user?.id || '')) {
+      // Include groups where the user is a participant or the creator
+      if (chat.participants.includes(user?.id || '') || chat.created_by === user?.id) {
         console.log('✅ Adding group chat:', { id: chat.id, name: chat.name, created_by: chat.created_by });
         groupChats.push(chat);
       } else {
-        console.log('❌ User not in group participants:', { id: chat.id, name: chat.name, participants: chat.participants });
+        console.log('❌ User not in group participants or creator:', { id: chat.id, name: chat.name, participants: chat.participants, created_by: chat.created_by });
       }
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
@@ -82,16 +91,70 @@ export default function ChatsScreen() {
           groupedChats[otherUserId] = [];
         }
         groupedChats[otherUserId].push(chat);
+        // Check if the user is not in friends list to fetch data later
+        if (!friends.some(f => f.id === otherUserId)) {
+          unknownUserIds.push(otherUserId);
+          console.log('🔍 Unknown user ID added for fetching:', otherUserId);
+        } else {
+          console.log('✅ Friend found for chat:', { userId: otherUserId, chatId: chat.id });
+        }
       }
     }
   });
+
+  // Fetch data for unknown users
+  const fetchUnknownUserData = async () => {
+    if (unknownUserIds.length === 0) return;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, avatar')
+        .in('id', unknownUserIds);
+      if (error) {
+        console.error('Error fetching unknown user data:', error);
+        return;
+      }
+      if (data) {
+        // Update local state with fetched data
+        setTemporaryUsers(prev => {
+          const newUsers = data.filter(newUser => !prev.some(user => user.id === newUser.id));
+          return [...prev, ...newUsers];
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching unknown user data:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (unknownUserIds.length > 0) {
+      fetchUnknownUserData();
+    }
+  }, [unknownUserIds.length]);
 
   // Sort chats by most recent activity (last_message_time or updated_at)
   const sortChatsByActivity = (chats: Chat[]) => {
     return chats.sort((a, b) => {
       const timeA = a.last_message_time || a.updated_at;
       const timeB = b.last_message_time || b.updated_at;
+      console.log('🕒 Chat activity sorting:', {
+        chatA: { id: a.id, lastMessageTime: a.last_message_time, updatedAt: a.updated_at, timeUsed: timeA },
+        chatB: { id: b.id, lastMessageTime: b.last_message_time, updatedAt: b.updated_at, timeUsed: timeB }
+      });
       return new Date(timeB).getTime() - new Date(timeA).getTime();
+    });
+  };
+
+  // Update chats with isFromPing flag
+  const updateChatsWithPingFlag = (chats: Chat[]): Chat[] => {
+    return chats.map(chat => {
+      if (!chat.is_group && chat.participants.length === 2) {
+        const otherUserId = chat.participants.find(p => p !== user?.id);
+        if (otherUserId && !friends.some(f => f.id === otherUserId)) {
+          return { ...chat, isFromPing: true };
+        }
+      }
+      return chat;
     });
   };
 
@@ -100,11 +163,13 @@ export default function ChatsScreen() {
   const unpinnedUserChats: [string, Chat[]][] = [];
   Object.entries(groupedChats).forEach(([userId, chats]) => {
     const friend = friends.find(f => f.id === userId);
-    const chatName = friend?.name || 'Unknown';
+    const tempUser = temporaryUsers.find(u => u.id === userId);
+    const chatName = friend?.name || tempUser?.name || 'Unknown';
     if (searchQuery === '' || chatName.toLowerCase().includes(searchQuery.toLowerCase())) {
       // Sort chats for this user by activity
       const sortedChats = sortChatsByActivity([...chats]);
       if (sortedChats.some(chat => chat.isPinned)) {
+        console.log('📌 Rendering pinned user chat:', { userId, chatName, chatId: sortedChats[0].id });
         pinnedUserChats.push([userId, sortedChats]);
       } else {
         unpinnedUserChats.push([userId, sortedChats]);
@@ -120,7 +185,7 @@ export default function ChatsScreen() {
     console.log('🔍 Categorizing group chats:', {
       totalGroupChats: chats.length,
       currentUserId: user?.id,
-      chats: chats.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_group: c.is_group }))
+      chats: chats.map(c => ({ id: c.id, name: c.name, created_by: c.created_by, is_group: c.is_group, isPinned: c.isPinned }))
     });
     
     chats.forEach(chat => {
@@ -133,15 +198,16 @@ export default function ChatsScreen() {
         created_by: chat.created_by,
         currentUserId: user?.id,
         isCreatedByUser: chat.created_by === user?.id,
+        isPinned: chat.isPinned,
         matchesSearch
       });
       
       if (matchesSearch) {
         if (chat.created_by === user?.id) {
-          console.log('✅ Adding to createdGroups:', chat.id);
+          console.log('✅ Adding to createdGroups:', chat.id, 'Pinned:', chat.isPinned);
           createdGroups.push(chat);
         } else {
-          console.log('✅ Adding to joinedGroups:', chat.id);
+          console.log('✅ Adding to joinedGroups:', chat.id, 'Pinned:', chat.isPinned);
           joinedGroups.push(chat);
         }
       }
@@ -167,6 +233,9 @@ export default function ChatsScreen() {
   const pinnedJoinedGroups = sortedJoinedGroups.filter(chat => chat.isPinned);
   const unpinnedJoinedGroups = sortedJoinedGroups.filter(chat => !chat.isPinned);
   
+  console.log('📌 Pinned created groups:', pinnedCreatedGroups.map(chat => ({ id: chat.id, name: chat.name })));
+  console.log('📌 Pinned joined groups:', pinnedJoinedGroups.map(chat => ({ id: chat.id, name: chat.name })));
+  
   // Combine all groups in priority order: pinned created, unpinned created, pinned joined, unpinned joined
   const allGroupChats = [
     ...pinnedCreatedGroups,
@@ -183,14 +252,26 @@ export default function ChatsScreen() {
   pinnedUserChats.sort(([, chatsA], [, chatsB]) => {
     const timeA = chatsA[0].last_message_time || chatsA[0].updated_at;
     const timeB = chatsB[0].last_message_time || chatsB[0].updated_at;
+    console.log('📌 Sorting pinned chats:', {
+      chatA: { userId: chatsA[0].participants.find(p => p !== user?.id), time: timeA },
+      chatB: { userId: chatsB[0].participants.find(p => p !== user?.id), time: timeB }
+    });
     return new Date(timeB).getTime() - new Date(timeA).getTime();
   });
 
   unpinnedUserChats.sort(([, chatsA], [, chatsB]) => {
     const timeA = chatsA[0].last_message_time || chatsA[0].updated_at;
     const timeB = chatsB[0].last_message_time || chatsB[0].updated_at;
+    console.log('📋 Sorting unpinned chats:', {
+      chatA: { userId: chatsA[0].participants.find(p => p !== user?.id), time: timeA },
+      chatB: { userId: chatsB[0].participants.find(p => p !== user?.id), time: timeB }
+    });
     return new Date(timeB).getTime() - new Date(timeA).getTime();
   });
+
+  // Apply isFromPing flag to chats
+  const updatedPinnedUserChats = pinnedUserChats.map(([userId, chats]) => [userId, updateChatsWithPingFlag(chats)]);
+  const updatedUnpinnedUserChats = unpinnedUserChats.map(([userId, chats]) => [userId, updateChatsWithPingFlag(chats)]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -264,20 +345,30 @@ export default function ChatsScreen() {
                 </Card>
               ) : (
                 <>
-                  {pinnedUserChats.length > 0 && (
+                  {updatedPinnedUserChats.length > 0 && (
                     <>
                       <Text variant="titleMedium" style={styles.sectionTitle}>Pinned Chats</Text>
-                      {pinnedUserChats.map(([userId, userChats], index) => (
-                        <ChatItem key={`pinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
-                      ))}
+                      {updatedPinnedUserChats.map((item, index) => {
+                        const userId = item[0];
+                        const chats = item[1] as Chat[];
+                        if (chats.length > 0) {
+                          return <ChatItem key={`pinned-user-${userId}-${chats[0].id}`} chat={chats[0]} userChats={chats} temporaryUsers={temporaryUsers} />;
+                        }
+                        return null;
+                      })}
                     </>
                   )}
-                  {unpinnedUserChats.length > 0 && (
+                  {updatedUnpinnedUserChats.length > 0 && (
                     <>
                       <Text variant="titleMedium" style={styles.sectionTitle}>Recent Chats</Text>
-                      {unpinnedUserChats.map(([userId, userChats], index) => (
-                        <ChatItem key={`unpinned-user-${userId}-${userChats[0].id}`} chat={userChats[0]} userChats={userChats} />
-                      ))}
+                      {updatedUnpinnedUserChats.map((item, index) => {
+                        const userId = item[0];
+                        const chats = item[1] as Chat[];
+                        if (chats.length > 0) {
+                          return <ChatItem key={`unpinned-user-${userId}-${chats[0].id}`} chat={chats[0]} userChats={chats} temporaryUsers={temporaryUsers} />;
+                        }
+                        return null;
+                      })}
                     </>
                   )}
                 </>

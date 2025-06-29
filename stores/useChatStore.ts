@@ -167,7 +167,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const updatedChats = chats.map(chat => 
         chat.id === chatId ? { ...chat, isPinned: data.is_pinned } : chat
       );
+      console.log('📌 Updated pinned status for chat:', { chatId, isPinned: data.is_pinned });
       set({ chats: updatedChats });
+      
+      // Ensure the updated chat is cached with the correct pinned status
+      await offlineStorage.cacheChats(updatedChats);
     } catch (error: any) {
       set({ error: error.message });
     }
@@ -247,6 +251,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return bTime - aTime;
           });
           
+          console.log('📌 Pinned chats after load:', sortedChats.filter(chat => chat.isPinned).map(chat => ({ id: chat.id, name: chat.name })));
+          
           set({ chats: sortedChats, isLoading: false });
         } catch (serverError) {
           console.error('❌ Server error, falling back to cache:', serverError);
@@ -258,6 +264,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const bTime = new Date(b.last_message_time || b.updated_at).getTime();
             return bTime - aTime;
           });
+          console.log('📌 Pinned chats from cache:', sortedChats.filter(chat => chat.isPinned).map(chat => ({ id: chat.id, name: chat.name })));
           set({ chats: sortedChats, isLoading: false, error: 'Using cached data' });
         }
       } else {
@@ -270,6 +277,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           const bTime = new Date(b.last_message_time || b.updated_at).getTime();
           return bTime - aTime;
         });
+        console.log('📌 Pinned chats from offline cache:', sortedChats.filter(chat => chat.isPinned).map(chat => ({ id: chat.id, name: chat.name })));
         set({ chats: sortedChats, isLoading: false });
       }
     } catch (error: any) {
@@ -535,39 +543,73 @@ export const useChatStore = create<ChatState>((set, get) => ({
       globalChatSubscription.unsubscribe();
     }
     
-    const subscription = {
-      unsubscribe: () => {}
-    };
-    // Placeholder for subscription logic
-    // const subscription = chatService.subscribeToAllChats(userId, (payload: any) => {
-    //   if (payload.eventType === 'INSERT') {
-    //     const newMessage = payload.new;
-    //     const { chats } = get();
-    //     
-    //     const updatedChats = chats.map(chat => {
-    //       if (chat.id === newMessage.chat_id) {
-    //         return {
-    //           ...chat,
-    //           last_message: newMessage.text,
-    //           last_message_time: newMessage.timestamp,
-    //           unread_count: (chat.unread_count || 0) + 1,
-    //           updated_at: new Date()
-    //         };
-    //       }
-    //       return chat;
-    //     });
-    //     
-    //     const sortedChats = updatedChats.sort((a, b) => {
-    //       const aTime = new Date(a.last_message_time || a.updated_at).getTime();
-    //       const bTime = new Date(b.last_message_time || b.updated_at).getTime();
-    //       return bTime - aTime;
-    //     });
-    //     
-    //     set({ chats: sortedChats });
-    //     get().updateUnreadCount();
-    //   }
-    // });
+    const subscription = supabase
+      .channel(`user-chats:${userId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `chat_id=in.((SELECT id FROM chats WHERE participants @> ARRAY['${userId}']::varchar[] OR created_by = '${userId}'))`
+      }, (payload) => {
+        console.log('📩 New message received via subscription:', {
+          payload: payload,
+          chatId: payload.new.chat_id,
+          messageContent: payload.new.content,
+          timestamp: payload.new.created_at
+        });
+        const newMessage = payload.new;
+        const { chats } = get();
+        
+        const updatedChats = chats.map(chat => {
+          if (chat.id === newMessage.chat_id) {
+            console.log('🔄 Updating chat with new message:', {
+              chatId: chat.id,
+              oldLastMessageTime: chat.last_message_time,
+              newLastMessageTime: new Date(newMessage.created_at)
+            });
+            return {
+              ...chat,
+              last_message: newMessage.content || 'Media',
+              last_message_time: new Date(newMessage.created_at),
+              unread_count: (chat.unread_count || 0) + 1,
+              updated_at: new Date()
+            };
+          }
+          return chat;
+        });
+        
+        const sortedChats = updatedChats.sort((a, b) => {
+          const aTime = new Date(a.last_message_time || a.updated_at).getTime();
+          const bTime = new Date(b.last_message_time || b.updated_at).getTime();
+          console.log('🔄 Sorting chats after new message:', {
+            chatA: { id: a.id, time: aTime },
+            chatB: { id: b.id, time: bTime }
+          });
+          return bTime - aTime;
+        });
+        
+        set({ chats: sortedChats });
+        get().updateUnreadCount();
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chats',
+        filter: `participants=cs.{${userId}}`
+      }, (payload) => {
+        console.log('🆕 New chat received via subscription:', payload);
+        const newChat = {
+          ...payload.new,
+          created_at: payload.new.created_at ? new Date(payload.new.created_at) : new Date(),
+          updated_at: payload.new.updated_at ? new Date(payload.new.updated_at) : new Date()
+        } as Chat;
+        const { chats } = get();
+        const updatedChats = [newChat, ...chats];
+        set({ chats: updatedChats });
+      })
+      .subscribe();
     
+    console.log('📡 Subscribed to all chats for user:', userId);
     set({ globalChatSubscription: subscription });
   },
   

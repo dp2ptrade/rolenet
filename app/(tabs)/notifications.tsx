@@ -43,7 +43,14 @@ export default function NotificationsScreen() {
         router.push(`/chat?chatId=${notification.data?.chat_id}`);
         break;
       case 'ping':
-        router.push(`/public-profile?userId=${notification.data?.sender_id}`);
+        // Navigate to chat screen for ping response, passing sender data
+        router.push({
+          pathname: '/chat',
+          params: {
+            userId: notification.data?.sender_id,
+            pingId: notification.id
+          }
+        });
         break;
       case 'call':
         router.push(`/call?callId=${notification.data?.call_id}`);

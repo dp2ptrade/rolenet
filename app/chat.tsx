@@ -33,8 +33,11 @@ interface Message {
 }
 
 export default function ChatScreen() {
-  const { userId, userName, userRole, userAvatar, pingId, chatId, chatName, isGroup, participants } = useLocalSearchParams();
+  const { userId, userName: initialUserName, userRole: initialUserRole, userAvatar: initialUserAvatar, pingId, chatId, chatName, isGroup, participants } = useLocalSearchParams();
   const isGroupChat = isGroup === 'true';
+  const [userName, setUserName] = useState(initialUserName as string || '');
+  const [userRole, setUserRole] = useState(initialUserRole as string || '');
+  const [userAvatar, setUserAvatar] = useState(initialUserAvatar as string || '');
 
   // All hooks must be called before any conditional returns
   const [messages, setMessages] = useState<Message[]>([]);
@@ -122,6 +125,31 @@ export default function ChatScreen() {
     useEffect(() => {
     if (!currentUser?.id) return;
     let targetChatId = chatId as string | undefined;
+
+    // Fetch user data if not provided or incomplete
+    const fetchUserData = async () => {
+      if (!userId || (userName && userAvatar)) return;
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, role, avatar')
+          .eq('id', userId)
+          .single();
+        if (error) {
+          console.error('Error fetching user data:', error);
+          return;
+        }
+        if (data) {
+          setUserName(data.name || 'Unknown User');
+          setUserRole(data.role || '');
+          setUserAvatar(data.avatar || '');
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    };
+
+    fetchUserData();
 
     // Load chat history
     const fetchMessages = async () => {
@@ -465,7 +493,7 @@ export default function ChatScreen() {
     if (pingId && messages.length === 0 && !isGroupChat) {
       const initialMessage: Message = {
         id: `ping-context-${Date.now()}`,
-        text: `This chat was started in response to your ping. How can I help you?`,
+        text: `Hi, I'm ${currentUser?.name}`,
         sender_id: userId as string,
         chat_id: '',
         timestamp: new Date().toISOString(),

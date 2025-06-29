@@ -237,8 +237,8 @@ const WelcomeGuideScreen = () => {
               mode="contained"
               onPress={handleGetStarted}
               style={styles.getStartedButton}
-              buttonColor={COLORS.WHITE}
-              textColor="#0ea5e9"
+              buttonColor="#83A7F6"
+              textColor="#ffffff"
             >
               Get Started
             </Button>

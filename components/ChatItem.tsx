@@ -8,7 +8,7 @@ import { useFriendStore } from '@/stores/useFriendStore';
 import { useChatStore } from '@/stores/useChatStore';
 import { Users, Pin } from 'lucide-react-native';
 
-export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }) => {
+export const ChatItem = ({ chat, userChats, temporaryUsers }: { chat: Chat; userChats?: Chat[]; temporaryUsers?: { id: string; name: string; avatar: string }[] }) => {
   const { user } = useUserStore();
   const { friends } = useFriendStore();
 
@@ -57,9 +57,9 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
       return <Avatar.Icon size={50} icon={({ size, color }) => <Users size={size} color={color} />} />;
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
-      const otherUser = friends.find(f => f.id === otherUserId);
+      const otherUser = friends.find(f => f.id === otherUserId) || (temporaryUsers || []).find(u => u.id === otherUserId);
       
-      // If friend data is not loaded yet, show a placeholder avatar
+      // If user data is not loaded yet, show a placeholder avatar
       if (!otherUser || !otherUser.avatar) {
         return <Avatar.Text size={50} label={otherUser?.name?.charAt(0) || '?'} />;
       }
@@ -74,7 +74,7 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
       return chat.name || `Group Chat (${chat.participants.length})`;
     } else {
       const otherUserId = chat.participants.find(p => p !== user?.id);
-      const otherUser = friends.find(f => f.id === otherUserId);
+      const otherUser = friends.find(f => f.id === otherUserId) || (temporaryUsers || []).find(u => u.id === otherUserId);
       return otherUser?.name || 'Unknown';
     }
   };
@@ -106,9 +106,16 @@ export const ChatItem = ({ chat, userChats }: { chat: Chat; userChats?: Chat[] }
       <Card.Content style={styles.chatContent}>
         {getChatAvatar()}
         <View style={styles.chatDetails}>
-          <Text variant="titleMedium" style={styles.chatName}>
-            {getChatName()}
-          </Text>
+          <View style={styles.chatNameContainer}>
+            <Text variant="titleMedium" style={styles.chatName}>
+              {getChatName()}
+            </Text>
+            {chat.isFromPing && (
+              <View style={styles.pingTag}>
+                <Text style={styles.pingTagText}>Ping</Text>
+              </View>
+            )}
+          </View>
           <Text variant="bodyMedium" style={styles.chatSubtitle} numberOfLines={1}>
             {getChatSubtitle()}
           </Text>
@@ -138,9 +145,25 @@ const styles = StyleSheet.create({
     marginLeft: 16,
     flex: 1,
   },
+  chatNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   chatName: {
     fontWeight: 'bold',
-    marginBottom: 4,
+  },
+  pingTag: {
+    marginLeft: 8,
+    backgroundColor: '#38BDF8',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pingTagText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   chatSubtitle: {
     color: '#6B7280',

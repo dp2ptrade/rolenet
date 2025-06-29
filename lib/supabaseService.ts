@@ -743,10 +743,10 @@ export class ChatService {
   static async getUserChats(userId: string, limit: number = CONFIG.CHATS.DEFAULT_LIMIT) {
     console.log('🔍 getUserChats called with userId:', userId, 'limit:', limit);
     
-    // Try multiple query approaches to ensure we get all chats
+    // Fetch all chats where user is a participant or creator
     const { data, error } = await supabase
       .from('chats')
-      .select('*')
+      .select('*, is_pinned')
       .or(`participants.cs.{${userId}},created_by.eq.${userId}`)
       .order('updated_at', { ascending: false })
       .limit(limit);
@@ -756,7 +756,8 @@ export class ChatService {
       error: error?.message || 'none',
       groupChats: data?.filter(chat => chat.is_group)?.length || 0,
       directChats: data?.filter(chat => !chat.is_group)?.length || 0,
-      createdByUser: data?.filter(chat => chat.created_by === userId)?.length || 0
+      createdByUser: data?.filter(chat => chat.created_by === userId)?.length || 0,
+      pinnedChats: data?.filter(chat => chat.is_pinned)?.length || 0
     });
     
     if (data) {
@@ -767,8 +768,27 @@ export class ChatService {
         created_by: chat.created_by,
         participants: chat.participants,
         isUserCreator: chat.created_by === userId,
-        isUserParticipant: chat.participants?.includes(userId)
+        isUserParticipant: chat.participants?.includes(userId),
+        isPinned: chat.is_pinned
       })));
+      
+      // Additional debug logging to track potential data issues
+      const missingParticipantChats = data.filter(chat => chat.is_group && !chat.participants?.includes(userId) && chat.created_by !== userId);
+      if (missingParticipantChats.length > 0) {
+        console.warn('⚠️ Found group chats where user is neither participant nor creator:', missingParticipantChats.map(chat => ({
+          id: chat.id,
+          name: chat.name,
+          participants: chat.participants,
+          created_by: chat.created_by
+        })));
+      }
+      
+      // Map is_pinned to isPinned for application consistency
+      const mappedData = data.map(chat => ({
+        ...chat,
+        isPinned: chat.is_pinned
+      }));
+      return { data: mappedData, error };
     }
     
     return { data, error };

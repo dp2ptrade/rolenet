@@ -12,7 +12,7 @@ export default {
     newArchEnabled: false,
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.zxoom.rolenet-app",
+      bundleIdentifier: "com.rolenet.rolenet-app",
       associatedDomains: ["applinks:rolenet.site"]
     },
     android: {
@@ -31,7 +31,7 @@ export default {
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      package: "com.zxoom.rolenetapp",
+      package: "com.rolenet.rolenet-app",
       intentFilters: [
         {
           action: "VIEW",

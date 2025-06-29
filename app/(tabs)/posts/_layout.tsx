@@ -4,7 +4,7 @@ import { Stack } from 'expo-router';
 import { Drawer } from 'react-native-drawer-layout';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, IconButton, List, Divider, Surface, Icon } from 'react-native-paper';
-import { FileText, CirclePlus as PlusCircle, Bookmark, User, Settings, ChevronLeft, Menu, ChevronRight } from 'lucide-react-native';
+import { FileText, CirclePlus as PlusCircle, Bookmark, User, Settings, ChevronLeft, Menu, ChevronRight, Search } from 'lucide-react-native';
 import { router, usePathname } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -44,7 +44,7 @@ export default function PostsLayout() {
         <List.Section>
           <List.Item
             title={isMini ? "" : "Browse Posts"}
-            left={props => Platform.OS === 'web' ? <Icon source="file-text" size={28} color={isActive('index') ? '#1E88E5' : '#424242'} /> : <FileText {...props} size={28} color={isActive('index') ? '#1E88E5' : '#424242'} />}
+            left={props => Platform.OS === 'web' ? <Icon source="magnify" size={28} color={isActive('index') ? '#1E88E5' : '#424242'} /> : <Search {...props} size={28} color={isActive('index') ? '#1E88E5' : '#424242'} />}
             onPress={() => {
               router.push('/posts');
               if (!isLargeScreen) setOpen(false);
@@ -138,7 +138,8 @@ export default function PostsLayout() {
           options={{
             headerShown: true,
             title: "Service Posts",
-            headerTitle: "Service Posts",
+            headerTitle: "Posts",
+            headerTitleAlign: 'center',
           }}
         />
         <Stack.Screen
@@ -179,18 +180,18 @@ export default function PostsLayout() {
 
 const styles = StyleSheet.create({
   drawer: {
-    width: 280,
+    width: 250,
     backgroundColor: '#FFFFFF',
   },
   permanentDrawer: {
-    width: 280,
+    width: 250,
     backgroundColor: '#FFFFFF',
     borderRightWidth: 1,
     borderRightColor: '#E5E7EB',
   },
   miniDrawer: {
-    width: 60,
-    backgroundColor: '#F8F9FA',
+    width: 48,
+    backgroundColor: 'rgba(248, 249, 250, 0.5)',
   },
   drawerContent: {
     flex: 1,
@@ -238,8 +239,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    width: 50,
-    height: 50,
+    width: 48,
+    height: 48,
   },
   activeMenuItem: {
     backgroundColor: 'rgba(59, 130, 246, 0.1)',

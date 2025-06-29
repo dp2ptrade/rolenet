@@ -21,6 +21,7 @@ import { useUserStore } from '@/stores/useUserStore';
 import { usePingStore } from '@/stores/usePingStore';
 import { useStatusStore } from '@/stores/useStatusStore';
 import { useAppStateStore } from '@/stores/useAppStateStore';
+import { useResponsive } from '@/hooks/useResponsive';
 import AnimatedStatusDot from '@/components/AnimatedStatusDot';
 import { ASSETS } from '@/constants/assets';
 import { User } from '@/lib/types';
@@ -537,6 +538,8 @@ export default function DiscoverTestScreen() {
     );
   };
 
+  const { getResponsiveValue, responsive } = useResponsive();
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -720,7 +723,7 @@ export default function DiscoverTestScreen() {
           data={searchResults}
           renderItem={renderUserItem}
           keyExtractor={(item) => item.user.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: responsive.isTablet ? 70 : 60 }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -939,6 +942,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingBottom: 0, // Adjusted to ensure content is not obscured by bottom navigation bar
   },
   searchContainer: {
     marginTop: -20,
@@ -1059,7 +1063,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listContent: {
-    paddingBottom: 100,
+    paddingBottom: 60, // Default value, will be overridden dynamically in component
   },
   popularChip: {
     backgroundColor: '#F8FAFC',

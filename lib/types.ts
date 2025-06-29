@@ -81,6 +81,7 @@ export interface Chat {
   created_at: Date;
   updated_at: Date;
   isPinned?: boolean;
+  isFromPing?: boolean; // Indicates if the chat originated from a ping message
 }
 
 export interface Message {
