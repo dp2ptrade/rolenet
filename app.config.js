@@ -31,7 +31,7 @@ export default {
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      package: "com.rolenet.rolenet-app",
+      package: "com.rolenet.rolenetapp",
       intentFilters: [
         {
           action: "VIEW",
