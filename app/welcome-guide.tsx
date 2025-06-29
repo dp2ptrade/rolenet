@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Image, Animated, Dimensions, Platform, TouchableOpacity, Linking, Easing } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Dimensions, Platform, TouchableOpacity, Linking, Easing } from 'react-native';
 import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
@@ -9,31 +9,96 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ASSETS } from '../constants/assets';
 import { COLORS, TYPOGRAPHY, SPACING, DIMENSIONS, ANIMATIONS } from '../constants/theme';
 import { getAnimationConfig } from '../utils/platform';
+import TechPartners from '../components/TechPartners';
 
-const WelcomeGuideScreen = () => {
-  const { width, height } = Dimensions.get('window');
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+const { width, height } = Dimensions.get('window');
+
+export default function WelcomeGuideScreen() {
+  const insets = useRef(new Animated.Value(0)).current;
+  const scaleValue = useRef(new Animated.Value(1)).current;
+  const [isPressed, setIsPressed] = useState(false);
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    // Platform-specific animation configuration to avoid native driver warnings
-    const fadeConfig = getAnimationConfig({
-      toValue: 1,
-      duration: ANIMATIONS.DURATION.EXTRA_SLOW,
-    });
-    
-    const scaleConfig = getAnimationConfig({
-      toValue: 1,
-      tension: ANIMATIONS.SPRING.TENSION,
-      friction: ANIMATIONS.SPRING.FRICTION,
+    // Initialize voice search service
+    VoiceSearchService.configure({
+      elevenLabsApiKey: '', // Add your ElevenLabs API key here
+      voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
 
-    // Start initial animations
-    Animated.parallel([
-      Animated.timing(fadeAnim, fadeConfig),
-      Animated.spring(scaleAnim, scaleConfig),
-    ]).start();
-  }, [fadeAnim, scaleAnim]);
+    let animationTimeout: any;
+  
+  // Start the rotation animation
+  const startRotation = () => {
+    rotateValue.setValue(0);
+    const animation = Animated.timing(rotateValue, {
+      toValue: 1,
+      duration: 3000, // 3 seconds for one full rotation
+      useNativeDriver: false,
+    });
+    animationRef.current = animation;
+    animation.start(({ finished }) => {
+      if (finished && !isPressed) {
+        // Wait 5 seconds before starting the next rotation
+        animationTimeout = setTimeout(() => {
+          startRotation(); // Loop the animation only if not pressed
+        }, 5000);
+      }
+    });
+  };
+  startRotation();
+  
+  loadUsers();
+  
+  return () => {
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    if (animationTimeout) {
+      clearTimeout(animationTimeout);
+    }
+  };
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+  // Handle press interactions for the logo
+  const handlePressIn = () => {
+    setIsPressed(true);
+    // Stop the rotation animation
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    // Scale up the logo
+    Animated.spring(scaleValue, {
+      toValue: 1.2,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    setIsPressed(false);
+    // Scale back to normal
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: false,
+    }).start(() => {
+      // Restart rotation animation
+      const startRotation = () => {
+        const animation = Animated.timing(rotateValue, {
+          toValue: 1,
+          duration: 4000,
+          useNativeDriver: false,
+        });
+        animationRef.current = animation;
+        animation.start(() => {
+          if (!isPressed) {
+            startRotation();
+          }
+        });
+      };
+      startRotation();
+    });
+  };
 
   const handleGetStarted = async () => {
     await AsyncStorage.setItem('hasSeenWelcomeGuide', 'true');
@@ -43,12 +108,12 @@ const WelcomeGuideScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <LinearGradient
-        colors={['#7dd3fc', '#38bdf8', '#0ea5e9', '#0284c7']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#0284c7', '#38bdf8', '#7dd3fc']}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+        <ScrollView
+          contentContainerStyle={styles.scrollViewContent}
+        >
         <View style={styles.header}>
           <View style={{
             shadowColor: '#0ea5e9',
@@ -230,6 +295,9 @@ const WelcomeGuideScreen = () => {
                 </Card.Content>
               </LinearGradient>
             </Card>
+            
+            {/* Tech Partners Section */}
+            <TechPartners />
           </View>
 
           <View style={styles.footer}>
@@ -268,8 +336,8 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: SPACING.LG,
     marginTop: SPACING.MD,
+    marginBottom: SPACING.LG,
   },
   logo: {
     width: DIMENSIONS.LOGO.WIDTH,
@@ -449,4 +517,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WelcomeGuideScreen;
+// Import necessary components
+import Animated from 'react-native-reanimated';
+import { useState } from 'react';
+import { VoiceSearchService } from '../lib/voiceSearch';
