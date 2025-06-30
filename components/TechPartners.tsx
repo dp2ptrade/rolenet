@@ -89,7 +89,7 @@ export default function TechPartners() {
             onPress={() => Linking.openURL('https://bolt.new/')}
           >
             <Image 
-              source={require('../assets/images/powered-by-bolt.svg')} 
+              source={require('../assets/images/logotext_poweredby_360w.png')} 
               style={styles.boltLogo}
               resizeMode="contain"
             />
