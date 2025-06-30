@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Image, Dimensions, Platform, TouchableOpacity, Linking, Easing, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, Image, Platform, TouchableOpacity, Linking, Easing, Animated, Dimensions } from 'react-native';
 import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
@@ -22,6 +22,9 @@ export default function WelcomeGuideScreen() {
   const scaleValue = useRef(new Animated.Value(1)).current;
   const [isPressed, setIsPressed] = useState(false);
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  
+  // Animation for floating button
+  const floatingButtonAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Initialize voice search service
@@ -29,20 +32,6 @@ export default function WelcomeGuideScreen() {
       elevenLabsApiKey: '', // Add your ElevenLabs API key here
       voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
-
-    // Initialize fade animation
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: false,
-    }).start();
-
-    // Initialize scale animation
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: false,
-    }).start();
 
     let animationTimeout: any;
   
@@ -65,6 +54,38 @@ export default function WelcomeGuideScreen() {
       });
     };
     startRotation();
+    
+    // Initialize fade animation
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 1000,
+      useNativeDriver: false,
+    }).start();
+
+    // Initialize scale animation
+    Animated.timing(scaleAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+    
+    // Floating button animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatingButtonAnim, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        }),
+        Animated.timing(floatingButtonAnim, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true
+        })
+      ])
+    ).start();
   
     return () => {
       if (animationRef.current) {
@@ -74,7 +95,7 @@ export default function WelcomeGuideScreen() {
         clearTimeout(animationTimeout);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle press interactions for the logo
@@ -119,6 +140,22 @@ export default function WelcomeGuideScreen() {
   const handleGetStarted = async () => {
     await AsyncStorage.setItem('hasSeenWelcomeGuide', 'true');
     router.replace('/auth/signin');
+  };
+
+  // Floating button animation style
+  const floatingButtonStyle = {
+    transform: [
+      {
+        translateY: floatingButtonAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -10]
+        })
+      }
+    ],
+    opacity: floatingButtonAnim.interpolate({
+      inputRange: [0, 0.5, 1],
+      outputRange: [0.8, 1, 0.8]
+    })
   };
 
   return (
@@ -315,19 +352,25 @@ export default function WelcomeGuideScreen() {
             {/* Tech Partners Section */}
             <TechPartners />
           </View>
-
-          <View style={styles.footer}>
-            <Button
-              mode="contained"
-              onPress={handleGetStarted}
-              style={styles.getStartedButton}
-              buttonColor="#83A7F6"
-              textColor="#ffffff"
-            >
-              Get Started
-            </Button>
-          </View>
         </ScrollView>
+
+        {/* Floating Get Started Button */}
+        <Animated.View style={[styles.floatingButtonContainer, floatingButtonStyle]}>
+          <LinearGradient
+            colors={['#3B82F6', '#0EA5E9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.floatingGradient}
+          >
+            <TouchableOpacity
+              style={styles.floatingButton}
+              onPress={handleGetStarted}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.floatingButtonText}>Get Started</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -530,5 +573,35 @@ const styles = StyleSheet.create({
     width: DIMENSIONS.POWERED_BY.WIDTH,
     height: DIMENSIONS.POWERED_BY.HEIGHT,
     resizeMode: 'contain',
+  },
+  // Floating button styles
+  floatingButtonContainer: {
+    position: 'absolute',
+    right: 20,
+    top: '50%',
+    zIndex: 1000,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    borderRadius: 30,
+  },
+  floatingGradient: {
+    borderRadius: 30,
+    padding: 2,
+  },
+  floatingButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  floatingButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
