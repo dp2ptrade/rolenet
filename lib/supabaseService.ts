@@ -1172,7 +1172,7 @@ export class PostService {
       .select('id')
       .eq('user_id', userId)
       .eq('post_id', postId)
-      .single();
+      .maybeSingle();
     
     return { isBookmarked: !!data, error };
   }
