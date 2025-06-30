@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Image, Dimensions, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ASSETS } from '../constants/assets';
 
 const { width } = Dimensions.get('window');
 const isSmallScreen = width < 375;
@@ -55,6 +56,26 @@ export default function TechPartners() {
             />
             <Text style={styles.logoText}>Entri</Text>
           </View>
+          
+          {/* Expo Logo */}
+          <View style={styles.logoWrapper}>
+            <Image 
+              source={require('../assets/images/expo-logo.png')} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>Expo</Text>
+          </View>
+          
+          {/* Bolt Logo */}
+          <View style={styles.logoWrapper}>
+            <Image 
+              source={ASSETS.IMAGES.BLACK_CIRCLE} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.logoText}>Bolt</Text>
+          </View>
         </View>
       </LinearGradient>
     </View>
@@ -102,7 +123,7 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     alignItems: 'center',
-    width: isTablet ? '22%' : '100%',
+    width: isTablet ? '30%' : '100%',
     marginBottom: isTablet ? 0 : 16,
     backgroundColor: 'rgba(31, 41, 55, 0.7)',
     borderRadius: 12,
@@ -121,6 +142,7 @@ const styles = StyleSheet.create({
     height: isTablet ? 40 : 32,
     width: '100%',
     marginBottom: 12,
+    tintColor: '#ffffff',
   },
   logoText: {
     fontSize: isTablet ? 14 : 12,
