@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, ScrollView, StyleSheet, Alert, Platform, TouchableOpacity, Linking, Dimensions } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert, Platform, TouchableOpacity, Linking, Dimensions, Animated } from 'react-native';
 import { Text, Button, Card, Title, Paragraph, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -647,6 +647,5 @@ const styles = StyleSheet.create({
 });
 
 // Import necessary components
-import Animated from 'react-native-reanimated';
 import { VoiceSearchService } from '../lib/voiceSearch';
 import { SmartSearchEngine, SearchFilters, SearchResult } from '../lib/searchEngine';
