@@ -20,6 +20,7 @@ config.resolver.alias = {
   // Fix React DOM compatibility for React 19
   'react-dom': 'react-native-web/dist/exports/ReactDOM',
   'react-dom/client': 'react-native-web/dist/exports/ReactDOM',
+  'react-dom/lib/ReactDOM': 'react-native-web/dist/exports/ReactDOM',
 };
 
 // Ensure proper asset resolution
