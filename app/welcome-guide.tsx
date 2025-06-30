@@ -1,17 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Image, Platform, TouchableOpacity, Linking, Easing, Animated, Dimensions } from 'react-native';
-import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Text, Button, Card, Title, Paragraph } from 'react-native-paper';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, ScrollView, StyleSheet, Alert, Platform, TouchableOpacity, Linking, Dimensions } from 'react-native';
+import { Text, Button, Card, Title, Paragraph, Surface } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Users, Search, MessageSquare, Bell, Star } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ASSETS } from '../constants/assets';
 import { COLORS, TYPOGRAPHY, SPACING, DIMENSIONS, ANIMATIONS } from '../constants/theme';
 import { getAnimationConfig } from '../utils/platform';
 import TechPartners from '../components/TechPartners';
-import { useState } from 'react';
-import { VoiceSearchService } from '../lib/voiceSearch';
+import { useState as useAnimatedState } from 'react';
+import { Image } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -35,68 +35,38 @@ export default function WelcomeGuideScreen() {
 
     let animationTimeout: any;
   
-    // Start the rotation animation
-    const startRotation = () => {
-      rotateValue.setValue(0);
-      const animation = Animated.timing(rotateValue, {
-        toValue: 1,
-        duration: 3000, // 3 seconds for one full rotation
-        useNativeDriver: false,
-      });
-      animationRef.current = animation;
-      animation.start(({ finished }) => {
-        if (finished && !isPressed) {
-          // Wait 5 seconds before starting the next rotation
-          animationTimeout = setTimeout(() => {
-            startRotation(); // Loop the animation only if not pressed
-          }, 5000);
-        }
-      });
-    };
-    startRotation();
-    
-    // Initialize fade animation
-    Animated.timing(fadeAnim, {
+  // Start the rotation animation
+  const startRotation = () => {
+    rotateValue.setValue(0);
+    const animation = Animated.timing(rotateValue, {
       toValue: 1,
-      duration: 1000,
+      duration: 3000, // 3 seconds for one full rotation
       useNativeDriver: false,
-    }).start();
-
-    // Initialize scale animation
-    Animated.timing(scaleAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: false,
-    }).start();
-    
-    // Floating button animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatingButtonAnim, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        }),
-        Animated.timing(floatingButtonAnim, {
-          toValue: 0,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true
-        })
-      ])
-    ).start();
+    });
+    animationRef.current = animation;
+    animation.start(({ finished }) => {
+      if (finished && !isPressed) {
+        // Wait 5 seconds before starting the next rotation
+        animationTimeout = setTimeout(() => {
+          startRotation(); // Loop the animation only if not pressed
+        }, 5000);
+      }
+    });
+  };
+  startRotation();
   
-    return () => {
-      if (animationRef.current) {
-        animationRef.current.stop();
-      }
-      if (animationTimeout) {
-        clearTimeout(animationTimeout);
-      }
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  loadUsers();
+  
+  return () => {
+    if (animationRef.current) {
+      animationRef.current.stop();
+    }
+    if (animationTimeout) {
+      clearTimeout(animationTimeout);
+    }
+  };
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
 
   // Handle press interactions for the logo
   const handlePressIn = () => {
@@ -137,25 +107,98 @@ export default function WelcomeGuideScreen() {
     });
   };
 
+  const loadUsers = async (appliedFilters: SearchFilters | null = null) => {
+    try {
+      setLoading(true);
+      const searchParams: any = { limit: CONFIG.SEARCH.DEFAULT_LIMIT };
+
+      // Apply filters if provided or if we have active filters
+      const filtersToApply = appliedFilters || filters;
+      if (filtersToApply.query) {
+        searchParams.query = filtersToApply.query;
+      }
+      if (filtersToApply.roles && filtersToApply.roles.length > 0) {
+        searchParams.roles = filtersToApply.roles;
+      }
+      if (filtersToApply.tags && filtersToApply.tags.length > 0) {
+        searchParams.tags = filtersToApply.tags;
+      }
+      if (filtersToApply.availability === 'available') {
+        searchParams.is_available = true;
+      }
+      if (filtersToApply.rating > 0) {
+        searchParams.min_rating = filtersToApply.rating;
+      }
+      if (filtersToApply.location === 'nearby' && currentUser?.location) {
+        searchParams.latitude = currentUser.location.latitude;
+        searchParams.longitude = currentUser.location.longitude;
+        searchParams.max_distance = filtersToApply.distance;
+      }
+      if (filtersToApply.sortBy) {
+        searchParams.sort_by = filtersToApply.sortBy;
+      }
+
+      const { data: usersData, error } = await userService.searchUsers(searchParams);
+      
+      if (error) {
+        console.error('Error loading users:', error);
+        setSnackbarMessage('Failed to load users from database');
+        setSnackbarVisible(true);
+        setUsers([]);
+      } else if (usersData && usersData.length > 0) {
+        console.log(`Successfully loaded ${usersData.length} users from database`);
+        const filteredUsers = usersData.filter(user => user.id !== currentUser?.id);
+        setUsers(filteredUsers);
+        setSnackbarMessage(`Found ${filteredUsers.length} professionals`);
+        setSnackbarVisible(true);
+        
+        // Extract popular roles and tags for quick filters
+        const roleCounts: { [key: string]: number } = {};
+        const tagCounts: { [key: string]: number } = {};
+        filteredUsers.forEach(user => {
+          roleCounts[user.role] = (roleCounts[user.role] || 0) + 1;
+          user.tags.forEach((tag: string) => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+          });
+        });
+        
+        const sortedRoles = Object.entries(roleCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(entry => entry[0])
+          .slice(0, 5);
+        setPopularRoles(sortedRoles);
+        
+        const sortedTags = Object.entries(tagCounts)
+          .sort((a, b) => b[1] - a[1])
+          .map(entry => entry[0])
+          .slice(0, 10);
+        setPopularTags(sortedTags);
+      } else {
+        console.warn('No users found in database');
+        setSnackbarMessage('No users found in database');
+        setSnackbarVisible(true);
+        setUsers([]);
+        setPopularRoles([]);
+        setPopularTags([]);
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+      setSnackbarMessage('Error connecting to database');
+      setSnackbarVisible(true);
+      setUsers([]);
+      setPopularRoles([]);
+      setPopularTags([]);
+    } finally {
+      setLoading(false);
+      if (appliedFilters) {
+        performSearch();
+      }
+    }
+  };
+
   const handleGetStarted = async () => {
     await AsyncStorage.setItem('hasSeenWelcomeGuide', 'true');
     router.replace('/auth/signin');
-  };
-
-  // Floating button animation style
-  const floatingButtonStyle = {
-    transform: [
-      {
-        translateY: floatingButtonAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, -10]
-        })
-      }
-    ],
-    opacity: floatingButtonAnim.interpolate({
-      inputRange: [0, 0.5, 1],
-      outputRange: [0.8, 1, 0.8]
-    })
   };
 
   return (
@@ -351,26 +394,26 @@ export default function WelcomeGuideScreen() {
             
             {/* Tech Partners Section */}
             <TechPartners />
+
+            {/* Get Started Button (now at the bottom of the content) */}
+            <View style={styles.getStartedContainer}>
+              <LinearGradient
+                colors={['#3B82F6', '#0EA5E9']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.getStartedGradient}
+              >
+                <TouchableOpacity
+                  style={styles.getStartedButton}
+                  onPress={handleGetStarted}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.getStartedText}>Get Started</Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </View>
           </View>
         </ScrollView>
-
-        {/* Floating Get Started Button */}
-        <Animated.View style={[styles.floatingButtonContainer, floatingButtonStyle]}>
-          <LinearGradient
-            colors={['#3B82F6', '#0EA5E9']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.floatingGradient}
-          >
-            <TouchableOpacity
-              style={styles.floatingButton}
-              onPress={handleGetStarted}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.floatingButtonText}>Get Started</Text>
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -527,11 +570,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.LG,
     alignItems: 'center',
   },
-  getStartedButton: {
-    width: '80%',
-    paddingVertical: SPACING.SM,
-    borderRadius: DIMENSIONS.BUTTON.BORDER_RADIUS,
-  },
   iconContainer: {
     alignItems: 'center',
     marginBottom: SPACING.MD,
@@ -574,34 +612,41 @@ const styles = StyleSheet.create({
     height: DIMENSIONS.POWERED_BY.HEIGHT,
     resizeMode: 'contain',
   },
-  // Floating button styles
-  floatingButtonContainer: {
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-    zIndex: 1000,
-    elevation: 8,
+  
+  // New Get Started Button styles (at the bottom of content)
+  getStartedContainer: {
+    marginTop: SPACING.LG,
+    marginBottom: SPACING.XL,
+    alignItems: 'center',
+    width: '100%',
+  },
+  getStartedGradient: {
+    borderRadius: 30,
+    padding: 2,
+    width: '80%',
+    maxWidth: 300,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    borderRadius: 30,
+    elevation: 8,
   },
-  floatingGradient: {
-    borderRadius: 30,
-    padding: 2,
-  },
-  floatingButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+  getStartedButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
     borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
-  floatingButtonText: {
+  getStartedText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 16,
+    fontSize: 18,
   },
 });
+
+// Import necessary components
+import Animated from 'react-native-reanimated';
+import { VoiceSearchService } from '../lib/voiceSearch';
+import { SmartSearchEngine, SearchFilters, SearchResult } from '../lib/searchEngine';
