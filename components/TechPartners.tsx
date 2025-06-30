@@ -21,66 +21,80 @@ export default function TechPartners() {
         </Text>
         
         <View style={styles.logosContainer}>
-          <View style={styles.logoWrapper}>
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://supabase.com/')}
+          >
             <Image 
               source={require('../assets/images/supabase.svg')} 
               style={styles.logo}
               resizeMode="contain"
             />
             <Text style={styles.logoText}>Supabase</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.logoWrapper}>
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://www.netlify.com/')}
+          >
             <Image 
               source={require('../assets/images/netlify.svg')} 
               style={styles.logo}
               resizeMode="contain"
             />
             <Text style={styles.logoText}>Netlify</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.logoWrapper}>
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://www.anthropic.com/')}
+          >
             <Image 
               source={require('../assets/images/anthropic-white.svg')} 
               style={styles.logo}
               resizeMode="contain"
             />
             <Text style={styles.logoText}>Anthropic</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.logoWrapper}>
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://entri.com/')}
+          >
             <Image 
               source={require('../assets/images/entri.svg')} 
               style={styles.logo}
               resizeMode="contain"
             />
             <Text style={styles.logoText}>Entri</Text>
-          </View>
+          </TouchableOpacity>
           
-          {/* Expo Logo */}
-          <View style={styles.logoWrapper}>
+          {/* Expo Logo with Hyperlink */}
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://expo.dev/')}
+          >
             <Image 
               source={require('../assets/images/expo-logo.png')} 
               style={styles.logo}
               resizeMode="contain"
+              tintColor="#ffffff"
             />
             <Text style={styles.logoText}>Expo</Text>
-          </View>
+          </TouchableOpacity>
           
           {/* Bolt Logo with Hyperlink */}
-          <View style={styles.logoWrapper}>
-            <TouchableOpacity 
-              onPress={() => Linking.openURL('https://bolt.new/')}
-              style={styles.logoTouchable}
-            >
-              <Image 
-                source={require('../assets/images/logotext_poweredby_360w (1) copy.png')} 
-                style={styles.boltLogo}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.logoWrapper}
+            onPress={() => Linking.openURL('https://bolt.new/')}
+          >
+            <Image 
+              source={require('../assets/images/black_circle_360x360.png')} 
+              style={styles.boltLogo}
+              resizeMode="contain"
+            />
             <Text style={styles.logoText}>Bolt</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     </View>
@@ -142,10 +156,6 @@ const styles = StyleSheet.create({
         }
       }
     })
-  },
-  logoTouchable: {
-    width: '100%',
-    alignItems: 'center',
   },
   logo: {
     height: isTablet ? 40 : 32,
