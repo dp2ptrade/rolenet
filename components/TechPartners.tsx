@@ -51,7 +51,7 @@ export default function TechPartners() {
           >
             <Image 
               source={require('../assets/images/anthropic-white.svg')} 
-              style={styles.logo}
+              style={[styles.logo, { height: isTablet ? 30 : 24 }]}
               resizeMode="contain"
             />
             <Text style={styles.logoText}>Anthropic</Text>
