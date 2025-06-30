@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Image, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Image, Dimensions, Platform, TouchableOpacity, Linking } from 'react-native';
 import { Text } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ASSETS } from '../constants/assets';
@@ -67,13 +67,18 @@ export default function TechPartners() {
             <Text style={styles.logoText}>Expo</Text>
           </View>
           
-          {/* Bolt Logo */}
+          {/* Bolt Logo with Hyperlink */}
           <View style={styles.logoWrapper}>
-            <Image 
-              source={ASSETS.IMAGES.BLACK_CIRCLE} 
-              style={styles.logo}
-              resizeMode="contain"
-            />
+            <TouchableOpacity 
+              onPress={() => Linking.openURL('https://bolt.new/')}
+              style={styles.logoTouchable}
+            >
+              <Image 
+                source={require('../assets/images/logotext_poweredby_360w (1) copy.png')} 
+                style={styles.boltLogo}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
             <Text style={styles.logoText}>Bolt</Text>
           </View>
         </View>
@@ -138,11 +143,20 @@ const styles = StyleSheet.create({
       }
     })
   },
+  logoTouchable: {
+    width: '100%',
+    alignItems: 'center',
+  },
   logo: {
     height: isTablet ? 40 : 32,
     width: '100%',
     marginBottom: 12,
     tintColor: '#ffffff',
+  },
+  boltLogo: {
+    height: isTablet ? 40 : 32,
+    width: '100%',
+    marginBottom: 12,
   },
   logoText: {
     fontSize: isTablet ? 14 : 12,
