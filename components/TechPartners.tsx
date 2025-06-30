@@ -75,7 +75,7 @@ export default function TechPartners() {
             onPress={() => Linking.openURL('https://expo.dev/')}
           >
             <Image 
-              source={require('../assets/images/expo-logo.png')} 
+              source={require('../assets/images/expo-logo.svg')} 
               style={styles.logo}
               resizeMode="contain"
               tintColor="#ffffff"
