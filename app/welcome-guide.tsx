@@ -12,6 +12,11 @@ import { getAnimationConfig } from '../utils/platform';
 import TechPartners from '../components/TechPartners';
 import { useState as useAnimatedState } from 'react';
 import { Image } from 'react-native';
+import { VoiceSearchService } from '../lib/voiceSearch';
+import { SmartSearchEngine, SearchFilters, SearchResult } from '../lib/searchEngine';
+import { userService } from '../lib/supabaseService';
+import { CONFIG } from '../lib/config/chatConfig';
+import { User } from '../lib/types';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +30,26 @@ export default function WelcomeGuideScreen() {
   
   // Animation for floating button
   const floatingButtonAnim = useRef(new Animated.Value(0)).current;
+
+  // Add missing state variables
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [popularRoles, setPopularRoles] = useState<string[]>([]);
+  const [popularTags, setPopularTags] = useState<string[]>([]);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>({
+    query: '',
+    location: 'nearby',
+    roles: [],
+    tags: [],
+    availability: 'all',
+    rating: 0,
+    experience: 'all',
+    distance: 50,
+    sortBy: 'relevance'
+  });
+  const currentUser = null; // Since this is welcome screen, no current user
 
   useEffect(() => {
     // Initialize voice search service
@@ -190,10 +215,17 @@ export default function WelcomeGuideScreen() {
       setPopularTags([]);
     } finally {
       setLoading(false);
-      if (appliedFilters) {
-        performSearch();
-      }
     }
+  };
+
+  const performSearch = () => {
+    // Since filtering is now done at database level, we can directly use the loaded users as search results
+    // But we still calculate relevance score and distance for display purposes
+    const searchFilters = { ...filters };
+    const userLocation = currentUser?.location;
+    
+    const results = SmartSearchEngine.search(users, searchFilters, userLocation);
+    return results;
   };
 
   const handleGetStarted = async () => {
@@ -645,7 +677,3 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
 });
-
-// Import necessary components
-import { VoiceSearchService } from '../lib/voiceSearch';
-import { SmartSearchEngine, SearchFilters, SearchResult } from '../lib/searchEngine';

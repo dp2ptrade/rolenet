@@ -50,7 +50,6 @@ export default function DiscoverTestScreen() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [pingModalVisible, setPingModalVisible] = useState(false);
   const [pingMessage, setPingMessage] = useState('');
-
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
