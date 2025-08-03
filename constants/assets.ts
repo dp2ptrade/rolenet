@@ -9,7 +9,6 @@ export const ASSETS = {
     ANIMATED_LOGO: require('../assets/images/rolenet-logo.png'), // Same as logo for consistency
     FAVICON: require('../assets/images/rolenet-logo.png'), // Using PNG logo as favicon
     PING_ICON: require('../assets/images/ping-icon.svg'),
-    POWERED_BY_BOLT: require('../assets/images/powered-by-bolt.svg'),
     ADAPTIVE_ICON: require('../assets/images/adaptive-icon.png'),
     ICON: require('../assets/images/icon.png'),
     BLACK_CIRCLE: require('../assets/images/black_circle_360x360.png'),

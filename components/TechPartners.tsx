@@ -81,19 +81,6 @@ export default function TechPartners() {
             />
             <Text style={styles.logoText}>Expo</Text>
           </TouchableOpacity>
-          
-          {/* Bolt Logo with Hyperlink */}
-          <TouchableOpacity 
-            style={styles.logoWrapper}
-            onPress={() => Linking.openURL('https://bolt.new/')}
-          >
-            <Image 
-              source={require('../assets/images/logotext_poweredby_360w.png')} 
-              style={styles.boltLogo}
-              resizeMode="contain"
-            />
-            <Text style={styles.logoText}>Bolt</Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
     </View>
@@ -161,11 +148,6 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 12,
     tintColor: '#ffffff',
-  },
-  boltLogo: {
-    height: isTablet ? 40 : 32,
-    width: '100%',
-    marginBottom: 12,
   },
   logoText: {
     fontSize: isTablet ? 14 : 12,

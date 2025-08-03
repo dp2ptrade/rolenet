@@ -258,21 +258,6 @@ export default function WelcomeGuideScreen() {
             />
           </View>
           <Title style={styles.title}>Welcome to RoleNet</Title>
-
-          <Animated.View style={[
-            styles.poweredByContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ scale: scaleAnim }]
-            }
-          ]}>
-            <TouchableOpacity onPress={() => Linking.openURL('https://bolt.new/')}>
-              <Image
-                source={ASSETS.IMAGES.POWERED_BY_BOLT}
-                style={styles.poweredByLogo}
-              />
-            </TouchableOpacity>
-          </Animated.View>
         </View>
         
         <View style={styles.content}>
@@ -638,12 +623,6 @@ const styles = StyleSheet.create({
     top: '8%',
     right: '5%',
     zIndex: 10,
-  },
-  poweredByLogo: {
-    width: DIMENSIONS.POWERED_BY.WIDTH,
-    height: DIMENSIONS.POWERED_BY.HEIGHT,
-    resizeMode: 'contain',
-  },
   
   // New Get Started Button styles (at the bottom of content)
   getStartedContainer: {

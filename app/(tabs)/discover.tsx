@@ -558,7 +558,6 @@ export default function DiscoverTestScreen() {
             </Text>
           </View>
           <TouchableOpacity 
-            onPress={() => Linking.openURL('https://bolt.new/')}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             activeOpacity={0.8}
