@@ -151,7 +151,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     tintColor: '#ffffff',
   },
-
   logoText: {
     fontSize: isTablet ? 14 : 12,
     color: '#E5E7EB',
