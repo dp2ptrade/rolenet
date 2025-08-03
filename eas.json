@@ -24,7 +24,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "gradleCommand": ":app:assembleStagingRelease"
+        "gradleCommand": ":app:assembleRelease"
       }
     },
     "production": {
