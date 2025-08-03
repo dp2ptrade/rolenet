@@ -58,11 +58,7 @@ export default function DiscoverTestScreen() {
   const { userStatuses, subscribeToUserStatuses, unsubscribeFromUserStatuses } = useStatusStore();
   const { updateActivity } = useAppStateStore();
 
-  // Animation for the rotating logo
-  const rotateValue = useRef(new Animated.Value(0)).current;
-  const scaleValue = useRef(new Animated.Value(1)).current;
-  const [isPressed, setIsPressed] = useState(false);
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+
 
   const [filters, setFilters] = useState<SearchFilters>({
     query: '',
@@ -83,79 +79,11 @@ export default function DiscoverTestScreen() {
       voiceId: 'pNInz6obpgDQGcFmaJgB' // Optional: specific voice ID
     });
 
-    let animationTimeout: any;
-  
-  // Start the rotation animation
-  const startRotation = () => {
-    rotateValue.setValue(0);
-    const animation = Animated.timing(rotateValue, {
-      toValue: 1,
-      duration: 3000, // 3 seconds for one full rotation
-      useNativeDriver: false,
-    });
-    animationRef.current = animation;
-    animation.start(({ finished }) => {
-      if (finished && !isPressed) {
-        // Wait 5 seconds before starting the next rotation
-        animationTimeout = setTimeout(() => {
-          startRotation(); // Loop the animation only if not pressed
-        }, 5000);
-      }
-    });
-  };
-  startRotation();
-  
-  loadUsers();
-  
-  return () => {
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-    if (animationTimeout) {
-      clearTimeout(animationTimeout);
-    }
-  };
+    loadUsers();
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
-  // Handle press interactions for the logo
-  const handlePressIn = () => {
-    setIsPressed(true);
-    // Stop the rotation animation
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-    // Scale up the logo
-    Animated.spring(scaleValue, {
-      toValue: 1.2,
-      useNativeDriver: false,
-    }).start();
-  };
 
-  const handlePressOut = () => {
-    setIsPressed(false);
-    // Scale back to normal
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: false,
-    }).start(() => {
-      // Restart rotation animation
-      const startRotation = () => {
-        const animation = Animated.timing(rotateValue, {
-          toValue: 1,
-          duration: 4000,
-          useNativeDriver: false,
-        });
-        animationRef.current = animation;
-        animation.start(() => {
-          if (!isPressed) {
-            startRotation();
-          }
-        });
-      };
-      startRotation();
-    });
-  };
 
   const loadUsers = async (appliedFilters: SearchFilters | null = null) => {
     try {
@@ -557,33 +485,6 @@ export default function DiscoverTestScreen() {
               ROLE NET
             </Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => Linking.openURL('https://bolt.new/')}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={0.8}
-          >
-            <Animated.Image 
-              source={ASSETS.IMAGES.BLACK_CIRCLE} 
-              style={[
-                styles.boltLogo,
-                {
-                  transform: [
-                    {
-                      rotate: rotateValue.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '360deg'],
-                      })
-                    },
-                    {
-                      scale: scaleValue
-                    }
-                  ]
-                }
-              ]} 
-              resizeMode="contain" 
-            />
-          </TouchableOpacity>
         </View>
         <View style={styles.searchBarContainer}>
           <TouchableOpacity onPress={() => setShowFilters(true)} style={styles.filterTab}>
@@ -933,11 +834,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  boltLogo: {
-    width: 45,
-    height: 45,
-    marginLeft: 10,
-  },
+
   content: {
     flex: 1,
     paddingHorizontal: 16,

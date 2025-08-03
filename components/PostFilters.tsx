@@ -13,13 +13,13 @@ interface PostFiltersProps {
   setShowModal: (show: boolean) => void;
 }
 
-const PostFilters: React.FC<PostFiltersProps> = ({ 
-  onApplyFilters, 
+const PostFilters: React.FC<PostFiltersProps> = ({
+  onApplyFilters,
   onResetFilters,
   showModal,
   setShowModal
 }) => {
-  const { 
+  const {
     categories,
     tags,
     searchQuery,
@@ -44,15 +44,15 @@ const PostFilters: React.FC<PostFiltersProps> = ({
     loadCategories,
     loadTags
   } = usePostStore();
-  
+
   const [localPriceRange, setLocalPriceRange] = useState<[number, number]>(priceRange);
   const [localMinRating, setLocalMinRating] = useState(minRating);
-  
+
   // Load categories and tags
   useEffect(() => {
     loadCategories();
   }, []);
-  
+
   useEffect(() => {
     if (selectedCategory) {
       loadTags(selectedCategory);
@@ -60,25 +60,25 @@ const PostFilters: React.FC<PostFiltersProps> = ({
       loadTags();
     }
   }, [selectedCategory]);
-  
+
   const handleApply = () => {
     // Apply local state to global state
     setPriceRange(localPriceRange);
     setMinRating(localMinRating);
-    
+
     onApplyFilters();
     setShowModal(false);
   };
-  
+
   const handleReset = () => {
     resetFilters();
     setLocalPriceRange([0, 10000]);
     setLocalMinRating(0);
-    
+
     onResetFilters();
     setShowModal(false);
   };
-  
+
   const toggleTag = (tag: string) => {
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
@@ -86,7 +86,7 @@ const PostFilters: React.FC<PostFiltersProps> = ({
       setSelectedTags([...selectedTags, tag]);
     }
   };
-  
+
   const getActiveFiltersCount = () => {
     let count = 0;
     if (selectedCategory) count++;
@@ -97,10 +97,10 @@ const PostFilters: React.FC<PostFiltersProps> = ({
     if (isRemoteOnly) count++;
     if (minRating > 0) count++;
     if (sortBy !== 'newest') count++;
-    
+
     return count;
   };
-  
+
   const formatPrice = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -109,7 +109,7 @@ const PostFilters: React.FC<PostFiltersProps> = ({
       maximumFractionDigits: 0
     }).format(value);
   };
-  
+
   return (
     <>
       {/* Search and filter bar */}
@@ -121,7 +121,7 @@ const PostFilters: React.FC<PostFiltersProps> = ({
           style={styles.searchBar}
           icon={({ size, color }) => <Filter size={size} color={color} />}
         />
-        
+
         <Button
           mode="contained"
           onPress={() => setShowModal(true)}
@@ -132,17 +132,17 @@ const PostFilters: React.FC<PostFiltersProps> = ({
           {getActiveFiltersCount() > 0 ? `Filters (${getActiveFiltersCount()})` : 'Filters'}
         </Button>
       </View>
-      
+
       {/* Active filters chips */}
       {getActiveFiltersCount() > 0 && (
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.activeFiltersContainer}
           contentContainerStyle={styles.activeFiltersContent}
         >
           {selectedCategory && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setSelectedCategory(null)}
               closeIcon={X}
@@ -150,9 +150,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
             </Chip>
           )}
-          
+
           {selectedTags.map(tag => (
-            <Chip 
+            <Chip
               key={tag}
               style={styles.activeFilterChip}
               onClose={() => toggleTag(tag)}
@@ -161,9 +161,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               {tag}
             </Chip>
           ))}
-          
+
           {experienceLevel && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setExperienceLevel(null)}
               closeIcon={X}
@@ -171,9 +171,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               {experienceLevel}
             </Chip>
           )}
-          
+
           {serviceType && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setServiceType(null)}
               closeIcon={X}
@@ -181,9 +181,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               {serviceType}
             </Chip>
           )}
-          
+
           {isRemoteOnly && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setIsRemoteOnly(false)}
               closeIcon={X}
@@ -191,9 +191,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               Remote Only
             </Chip>
           )}
-          
+
           {minRating > 0 && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setMinRating(0)}
               closeIcon={X}
@@ -201,9 +201,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               {minRating}+ Stars
             </Chip>
           )}
-          
+
           {sortBy !== 'newest' && (
-            <Chip 
+            <Chip
               style={styles.activeFilterChip}
               onClose={() => setSortBy('newest')}
               closeIcon={X}
@@ -211,9 +211,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
               Sort: {sortBy.replace('_', ' ')}
             </Chip>
           )}
-          
+
           {getActiveFiltersCount() > 0 && (
-            <Chip 
+            <Chip
               style={[styles.activeFilterChip, styles.clearAllChip]}
               onPress={handleReset}
             >
@@ -222,19 +222,19 @@ const PostFilters: React.FC<PostFiltersProps> = ({
           )}
         </ScrollView>
       )}
-      
+
       {/* Sort options as Tab Bar */}
       <View style={styles.tabContainer}>
         <Surface style={styles.tabBar} elevation={4}>
-          <TabSelector 
-            tabs={['newest', 'price_low', 'price_high', 'rating']} 
-            selectedTab={sortBy} 
-            onSelectTab={setSortBy} 
-            labels={['Newest', 'Price: Low to High', 'Price: High to Low', 'Top Rated']} 
+          <TabSelector
+            tabs={['newest', 'price_low', 'price_high', 'rating']}
+            selectedTab={sortBy}
+            onSelectTab={setSortBy}
+            labels={['Newest', 'Price: Low to High', 'Price: High to Low', 'Top Rated']}
           />
         </Surface>
       </View>
-      
+
       {/* Filters Modal */}
       <Portal>
         <Modal
@@ -245,21 +245,21 @@ const PostFilters: React.FC<PostFiltersProps> = ({
           <Surface style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text variant="titleLarge" style={styles.modalTitle}>Filters</Text>
-              <Button 
-                mode="text" 
+              <Button
+                mode="text"
                 onPress={() => setShowModal(false)}
                 icon={({ size, color }) => <X size={size} color={color} />}
               >
                 Close
               </Button>
             </View>
-            
+
             <ScrollView style={styles.modalScrollView}>
               {/* Categories */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Categories</Text>
               <View style={styles.categoriesContainer}>
-                <ScrollView 
-                  horizontal 
+                <ScrollView
+                  horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.categoriesContent}
                 >
@@ -275,9 +275,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   ))}
                 </ScrollView>
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Tags */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Tags</Text>
               <View style={styles.tagsContainer}>
@@ -292,9 +292,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   </Chip>
                 ))}
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Price Range */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Price Range</Text>
               <View style={styles.priceRangeContainer}>
@@ -325,9 +325,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   thumbTintColor="#3B82F6"
                 />
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Experience Level */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Experience Level</Text>
               <View style={styles.radioGroup}>
@@ -353,9 +353,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   </View>
                 </RadioButton.Group>
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Service Type */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Service Type</Text>
               <View style={styles.radioGroup}>
@@ -385,9 +385,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   </View>
                 </RadioButton.Group>
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Remote Only */}
               <View style={styles.switchContainer}>
                 <Text variant="titleMedium">Remote Only</Text>
@@ -396,9 +396,9 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                   onValueChange={setIsRemoteOnly}
                 />
               </View>
-              
+
               <Divider style={styles.divider} />
-              
+
               {/* Minimum Rating */}
               <Text variant="titleMedium" style={styles.sectionTitle}>Minimum Rating</Text>
               <View style={styles.ratingContainer}>
@@ -422,17 +422,17 @@ const PostFilters: React.FC<PostFiltersProps> = ({
                 </Text>
               </View>
             </ScrollView>
-            
+
             <View style={styles.modalFooter}>
-              <Button 
-                mode="outlined" 
+              <Button
+                mode="outlined"
                 onPress={handleReset}
                 style={styles.resetButton}
               >
                 Reset All
               </Button>
-              <Button 
-                mode="contained" 
+              <Button
+                mode="contained"
                 onPress={handleApply}
                 style={styles.applyButton}
               >
@@ -658,13 +658,13 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProp
   // Create animated values for the indicator
   const indicatorPosition = useSharedValue(0);
   const indicatorWidth = useSharedValue(0);
-  
+
   // References to measure tab widths
   const tabRefs = React.useRef<React.RefObject<View | null>[]>(tabs.map(() => React.createRef<View>()));
   const tabWidths = React.useRef<number[]>(tabs.map(() => 0));
   const tabPositions = React.useRef<number[]>(tabs.map(() => 0));
   const isLayoutCalculated = React.useRef<boolean>(false);
-  
+
   // Update indicator position when tab changes
   React.useEffect(() => {
     if (isLayoutCalculated.current) {
@@ -698,7 +698,7 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProp
       }
     }
   };
-  
+
   // Animated style for the indicator
   const indicatorStyle = useAnimatedStyle(() => {
     return {
@@ -711,19 +711,19 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProp
       borderRadius: 1.5,
     };
   });
-  
+
   return (
     <View style={styles.tabSelectorContainer}>
       {tabs.map((tab: string, index: number) => {
         const isSelected = tab === selectedTab;
-        
+
         // Create animated styles for each tab
         const tabAnimatedStyle = useAnimatedStyle(() => {
           return {
             opacity: withTiming(isSelected ? 1 : 0.7, { duration: 200 }),
             transform: [
-              { 
-                scale: withTiming(isSelected ? 1.05 : 1, { 
+              {
+                scale: withTiming(isSelected ? 1.05 : 1, {
                   duration: 200,
                   easing: Easing.bezier(0.25, 0.1, 0.25, 1),
                 })
@@ -731,7 +731,7 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProp
             ],
           };
         });
-        
+
         return (
           <Pressable
             key={tab}
@@ -745,7 +745,7 @@ function TabSelector({ tabs, selectedTab, onSelectTab, labels }: TabSelectorProp
             }}
           >
             <Animated.View style={[styles.tabItemContent, tabAnimatedStyle]}>
-              <Text 
+              <Text
                 style={[styles.tabText, isSelected && styles.selectedTabText]}
               >
                 {labels[index]}

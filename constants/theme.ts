@@ -73,10 +73,7 @@ export const DIMENSIONS = {
     WIDTH: Math.min(80, screenWidth * 0.2),
     HEIGHT: Math.min(80, screenWidth * 0.2),
   },
-  POWERED_BY: {
-    WIDTH: Math.min(120, screenWidth * 0.28),
-    HEIGHT: Math.min(36, screenWidth * 0.08),
-  },
+
   BUTTON: {
     HEIGHT: 48,
     BORDER_RADIUS: 30,

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { 
-  Modal, 
-  Portal, 
-  Card, 
-  Text, 
-  Button, 
-  Chip, 
-  Switch, 
+import {
+  Modal,
+  Portal,
+  Card,
+  Text,
+  Button,
+  Chip,
+  Switch,
   List,
   Divider,
   Surface
@@ -165,8 +165,8 @@ export default function SearchFiltersModal({
                       onValueChange={(value: number) => updateFilter('distance', Math.round(value))}
                       step={1}
                       thumbTintColor="#007AFF"
-                       minimumTrackTintColor="#3B82F6"
-                       maximumTrackTintColor="#E5E5E5"
+                      minimumTrackTintColor="#3B82F6"
+                      maximumTrackTintColor="#E5E5E5"
                     />
                   </View>
                 )}
@@ -286,8 +286,8 @@ export default function SearchFiltersModal({
                     onValueChange={(value: number) => updateFilter('rating', Math.round(value * 2) / 2)}
                     step={0.5}
                     thumbTintColor="#007AFF"
-                     minimumTrackTintColor="#F59E0B"
-                     maximumTrackTintColor="#E5E5E5"
+                    minimumTrackTintColor="#F59E0B"
+                    maximumTrackTintColor="#E5E5E5"
                   />
                 </View>
               </View>
