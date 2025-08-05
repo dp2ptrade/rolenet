@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ASSETS } from '../constants/assets';
 import { COLORS, TYPOGRAPHY, SPACING, DIMENSIONS } from '../constants/theme';
-import TechPartners from '../components/TechPartners';
+
 import { Image } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -215,8 +215,7 @@ export default function WelcomeGuideScreen() {
               </LinearGradient>
             </Card>
 
-            {/* Tech Partners Section */}
-            <TechPartners />
+
 
             {/* Get Started Button (now at the bottom of the content) */}
             <View style={styles.getStartedContainer}>
